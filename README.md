@@ -18,6 +18,8 @@ Running Playwright tests never requires an LLM, an AI API key, or any AI tool or
 (Claude, Copilot or others). You can remove the whole `agents/` directory and `npm test`
 still works. See [ADR-0001](docs/adr/0001-ai-outside-test-runtime.md).
 
+The demo application under test, RequestFlow, contains no AI functionality either.
+
 ## High-level architecture
 
 ```
@@ -35,7 +37,7 @@ still works. See [ADR-0001](docs/adr/0001-ai-outside-test-runtime.md).
 │ DETERMINISTIC RUNTIME (no AI)            │   │ reporting/           │
 │   specs/      requirements · test cases  │   │ traceability:        │
 │   tests/      Playwright specs           │   │ REQ → TC → result    │
-│   apps/<aut>/ page objects · data        │   └──────────────────────┘
+│   apps/<aut>/ AUT source · page objects  │   └──────────────────────┘
 │   framework/  fixtures · base classes ·  │
 │               config · public API        │
 └──────────────────────────────────────────┘
@@ -43,22 +45,23 @@ still works. See [ADR-0001](docs/adr/0001-ai-outside-test-runtime.md).
  docs/          architecture notes and ADRs
 ```
 
-| Directory       | Responsibility                                                              |
-| --------------- | --------------------------------------------------------------------------- |
-| `framework/`    | App-agnostic Playwright runtime: fixtures, base classes, config, data, API  |
-| `apps/`         | One adapter per application under test: page objects, components, test data |
-| `tests/`        | Playwright specs: test flow and business assertions only                    |
-| `specs/`        | Behavioral source of truth: requirements, test plans, test cases            |
-| `agents/`       | AI layer: shared standard, agent definitions, orchestrator                  |
-| `prompts/`      | Human-triggered entry points into the agent layer                           |
-| `integrations/` | Interfaces to external systems and their adapters                           |
-| `reporting/`    | Custom reporters and traceable run reports                                  |
-| `docs/`         | Architecture documentation and Architecture Decision Records                |
-| `artifacts/`    | Run outputs, traces, reports, AI proposals (gitignored)                     |
+| Directory       | Responsibility                                                                               |
+| --------------- | -------------------------------------------------------------------------------------------- |
+| `framework/`    | App-agnostic Playwright runtime: fixtures, base classes, config, data, API                   |
+| `apps/`         | One folder per application under test: AUT source (`app/`), later page objects and test data |
+| `tests/`        | Playwright specs: test flow and business assertions only                                     |
+| `specs/`        | Behavioral source of truth: requirements, test plans, test cases                             |
+| `agents/`       | AI layer: shared standard, agent definitions, orchestrator                                   |
+| `prompts/`      | Human-triggered entry points into the agent layer                                            |
+| `integrations/` | Interfaces to external systems and their adapters                                            |
+| `reporting/`    | Custom reporters and traceable run reports                                                   |
+| `docs/`         | Architecture documentation and Architecture Decision Records                                 |
+| `artifacts/`    | Run outputs, traces, reports, AI proposals (gitignored)                                      |
 
 ## Current project status
 
-**Phase 0: Foundation (in progress).** The project skeleton is in place and validated.
+**Phase 0: Foundation (in progress).** The project skeleton is in place and validated, and the
+demo application under test is implemented.
 
 Foundation:
 
@@ -71,14 +74,43 @@ Foundation:
 - [x] Validation passing (typecheck, lint, format check)
 - [x] [ADR-0001](docs/adr/0001-ai-outside-test-runtime.md): AI outside the test runtime
 
+Demo application ([RequestFlow v1](#demo-application-requestflow)):
+
+- [x] Local server-rendered UI and JSON API
+- [x] Employee and Reviewer roles with cookie-based demo authentication
+- [x] Request lifecycle: `DRAFT → SUBMITTED → APPROVED / REJECTED`
+- [x] Server-side authorization and validation
+- [x] Deterministic in-memory state
+
 Not implemented yet:
 
-- [ ] Demo application under test
 - [ ] Reference tests
 - [ ] Agent contracts (shared standard, artifact schemas)
 - [ ] Planner / Generator / Analyzer / Healer agents
 - [ ] LLM integration
 - [ ] External integrations (Jira, Azure DevOps, GitHub, MCP)
+
+## Demo application: RequestFlow
+
+RequestFlow is a small local application under test (AUT) built specifically for this QA
+automation portfolio. It models a generic request-and-approval workflow and provides:
+
+- a multi-role workflow (**Employee** creates and submits requests, **Reviewer** approves or
+  rejects them);
+- the same business rules through a UI and a JSON API;
+- state transitions with terminal states;
+- authorization by role and ownership;
+- validation with stable, machine-readable error codes;
+- deterministic local data, with no database or external services.
+
+```
+DRAFT → SUBMITTED → APPROVED
+                  ↘ REJECTED
+```
+
+The behavioral source of truth is
+[RequestFlow Requirements v1.2](specs/requestflow/requirements.md). The application code lives
+in [`apps/requestflow/app/`](apps/requestflow/app/).
 
 ## Planned phases
 
@@ -118,6 +150,28 @@ Playwright, TypeScript, ESLint and Prettier. You don't need to install any of th
 
 `npx playwright install chromium` downloads the Chromium browser that Playwright runs tests in.
 
+### Running RequestFlow
+
+```bash
+npm run aut:start
+```
+
+RequestFlow starts at **http://127.0.0.1:3100** (override with the `PORT` and `HOST`
+environment variables). `GET /health` returns `200 {"status":"ok"}` and can be used as a
+readiness check. State is held in memory, so every restart begins with no requests.
+
+### Demo users
+
+RequestFlow v1 uses simplified demo login: you choose one of the fixed synthetic users on the
+login page (or send its user ID to `POST /api/auth/login`). There are no passwords, OAuth or
+SSO.
+
+| User        | User ID      | Role       |
+| ----------- | ------------ | ---------- |
+| Alex Morgan | `emp-alex`   | `EMPLOYEE` |
+| Sam Rivera  | `emp-sam`    | `EMPLOYEE` |
+| Jordan Lee  | `rev-jordan` | `REVIEWER` |
+
 ### Environment configuration
 
 ```bash
@@ -130,8 +184,14 @@ cp .env.example .env
 | ---------- | --------------------------------------------------------------------- |
 | `BASE_URL` | Base URL of the application under test, used by Playwright navigation |
 
-No demo application has been selected or configured yet, so `BASE_URL` can stay empty.
-This configuration will evolve during Phase 0. Never commit real credentials or secrets.
+To point Playwright at a locally running RequestFlow, set this in your `.env`:
+
+```bash
+BASE_URL=http://127.0.0.1:3100
+```
+
+`.env.example` still ships with an empty `BASE_URL`, and Playwright does not start RequestFlow
+automatically yet. Never commit real credentials or secrets.
 
 ### Validate the development environment
 
@@ -150,6 +210,8 @@ npm run test:headed    # run tests in a visible browser
 
 The repository does not contain any reference tests yet. At the current Foundation stage,
 Playwright reports `Error: No tests found` and exits with a non-zero code. This is expected.
+RequestFlow has so far only been checked manually; those checks are not part of the automated
+test suite.
 
 Test results, traces and HTML reports are written to `artifacts/` (gitignored).
 
@@ -157,9 +219,17 @@ Test results, traces and HTML reports are written to `artifacts/` (gitignored).
 
 | Script                 | Purpose                        |
 | ---------------------- | ------------------------------ |
+| `npm run aut:start`    | Start RequestFlow locally      |
 | `npm test`             | Run Playwright tests headless  |
 | `npm run test:headed`  | Run tests in a visible browser |
 | `npm run lint`         | ESLint                         |
 | `npm run typecheck`    | TypeScript type check          |
 | `npm run format`       | Format with Prettier           |
 | `npm run format:check` | Verify formatting              |
+
+## Documentation
+
+- [RequestFlow Requirements v1.2](specs/requestflow/requirements.md): approved behavioral
+  baseline of the demo application
+- [ADR-0001](docs/adr/0001-ai-outside-test-runtime.md): AI agents are outside the deterministic
+  Playwright runtime
