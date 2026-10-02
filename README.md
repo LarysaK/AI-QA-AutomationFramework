@@ -60,8 +60,8 @@ The demo application under test, RequestFlow, contains no AI functionality eithe
 
 ## Current project status
 
-**Phase 0: Foundation (in progress).** The project skeleton is in place and validated, and the
-demo application under test is implemented.
+**Phase 0: Foundation (in progress).** The project skeleton, the demo application under test,
+the human QA test plan and the first canonical reference test are in place.
 
 Foundation:
 
@@ -82,11 +82,17 @@ Demo application ([RequestFlow v1](#demo-application-requestflow)):
 - [x] Server-side authorization and validation
 - [x] Deterministic in-memory state
 
+Test design and reference tests:
+
+- [x] [Human QA test plan](specs/requestflow/test-plan.md) for REQ-001 – REQ-010
+- [x] CAN-001: Employee creates a valid request (passing)
+- [x] Playwright starts and resets RequestFlow automatically
+
 Not implemented yet:
 
-- [ ] Reference tests
+- [ ] Remaining canonical reference tests (CAN-002 – CAN-005)
 - [ ] Agent contracts (shared standard, artifact schemas)
-- [ ] Planner / Generator / Analyzer / Healer agents
+- [ ] AI agents: Planner / Generator / Analyzer / Healer
 - [ ] LLM integration
 - [ ] External integrations (Jira, Azure DevOps, GitHub, MCP)
 
@@ -111,6 +117,30 @@ DRAFT → SUBMITTED → APPROVED
 The behavioral source of truth is
 [RequestFlow Requirements v1.2](specs/requestflow/requirements.md). The application code lives
 in [`apps/requestflow/app/`](apps/requestflow/app/).
+
+## Test design and canonical tests
+
+The [human QA test plan](specs/requestflow/test-plan.md) was written by hand, before any agent
+exists. It derives the test inventory from the requirements and traces every scenario to a
+requirement ID (REQ-001 – REQ-010).
+
+**Canonical tests** are a small set of handwritten reference tests selected from that plan.
+They fix the patterns for structure, semantic locators, page objects, test data and
+assertions. In a later phase, the Generator Agent will follow these patterns when it proposes
+further tests. The agent does not exist yet.
+
+| Canonical test | Scenario                         | Level | Traceability                  | Status          |
+| -------------- | -------------------------------- | ----- | ----------------------------- | --------------- |
+| CAN-001        | Employee creates a valid request | UI    | REQ-001 → TC-001-17 → CAN-001 | Implemented     |
+| CAN-002        | Request validation boundaries    | API   | REQ-001 → TC-001-03 – 12      | Not implemented |
+| CAN-003        | Employee edits own draft         | API   | REQ-002 → TC-002-01, 02, 04   | Not implemented |
+| CAN-004        | Request approval workflow        | E2E   | REQ-005, REQ-008              | Not implemented |
+| CAN-005        | Request rejection workflow       | E2E   | REQ-006, REQ-008              | Not implemented |
+
+CAN-001 lives in
+[`tests/requestflow/ui/create-request.spec.ts`](tests/requestflow/ui/create-request.spec.ts)
+and is tagged `@REQ-001 @TC-001-17 @CAN-001`. Its page objects are in
+[`apps/requestflow/pages/`](apps/requestflow/pages/).
 
 ## Planned phases
 
@@ -160,6 +190,9 @@ RequestFlow starts at **http://127.0.0.1:3100** (override with the `PORT` and `H
 environment variables). `GET /health` returns `200 {"status":"ok"}` and can be used as a
 readiness check. State is held in memory, so every restart begins with no requests.
 
+Starting RequestFlow manually is only needed to explore it in a browser. `npm test` starts
+it by itself (see [Running tests](#running-tests)).
+
 ### Demo users
 
 RequestFlow v1 uses simplified demo login: you choose one of the fixed synthetic users on the
@@ -180,18 +213,11 @@ cp .env.example .env
 
 `.env` is gitignored and loaded automatically by `playwright.config.ts`.
 
-| Variable   | Purpose                                                               |
-| ---------- | --------------------------------------------------------------------- |
-| `BASE_URL` | Base URL of the application under test, used by Playwright navigation |
+| Variable   | Purpose                                                                        |
+| ---------- | ------------------------------------------------------------------------------ |
+| `BASE_URL` | URL of RequestFlow for Playwright. Default when empty: `http://127.0.0.1:3100` |
 
-To point Playwright at a locally running RequestFlow, set this in your `.env`:
-
-```bash
-BASE_URL=http://127.0.0.1:3100
-```
-
-`.env.example` still ships with an empty `BASE_URL`, and Playwright does not start RequestFlow
-automatically yet. Never commit real credentials or secrets.
+The default works without changes. Never commit real credentials or secrets.
 
 ### Validate the development environment
 
@@ -208,28 +234,44 @@ npm test               # run Playwright tests headless
 npm run test:headed    # run tests in a visible browser
 ```
 
-The repository does not contain any reference tests yet. At the current Foundation stage,
-Playwright reports `Error: No tests found` and exits with a non-zero code. This is expected.
-RequestFlow has so far only been checked manually; those checks are not part of the automated
-test suite.
+You don't need to start RequestFlow first. `npm test`:
 
-Test results, traces and HTML reports are written to `artifacts/` (gitignored).
+1. starts RequestFlow (`npm run aut:start`) through Playwright's `webServer`;
+2. waits until `GET /health` responds;
+3. enables the test-only reset hook (`POST /__test/reset`) for that server;
+4. resets the application state once in `globalSetup`, so every run starts from the same
+   deterministic state;
+5. runs the Playwright suite;
+6. stops the server afterwards.
+
+Outside CI, Playwright reuses a RequestFlow server that is already running on the same address
+and leaves it running. That server must have been started with the test hooks enabled,
+otherwise `globalSetup` stops the run with an explanatory error. Stop it and let Playwright
+start its own.
+
+The reset hook exists only for automated tests. It is not part of the RequestFlow API, and a
+server started with `npm run aut:start` does not have it.
+
+Test results, HTML reports, and traces, screenshots and videos of failed tests are written to
+`artifacts/` (gitignored).
 
 ### Available scripts
 
-| Script                 | Purpose                        |
-| ---------------------- | ------------------------------ |
-| `npm run aut:start`    | Start RequestFlow locally      |
-| `npm test`             | Run Playwright tests headless  |
-| `npm run test:headed`  | Run tests in a visible browser |
-| `npm run lint`         | ESLint                         |
-| `npm run typecheck`    | TypeScript type check          |
-| `npm run format`       | Format with Prettier           |
-| `npm run format:check` | Verify formatting              |
+| Script                 | Purpose                                             |
+| ---------------------- | --------------------------------------------------- |
+| `npm run aut:start`    | Start RequestFlow locally                           |
+| `npm test`             | Start RequestFlow and run Playwright tests headless |
+| `npm run test:headed`  | Same, in a visible browser                          |
+| `npm run lint`         | ESLint                                              |
+| `npm run typecheck`    | TypeScript type check                               |
+| `npm run format`       | Format with Prettier                                |
+| `npm run format:check` | Verify formatting                                   |
 
 ## Documentation
 
 - [RequestFlow Requirements v1.2](specs/requestflow/requirements.md): approved behavioral
   baseline of the demo application
+- [RequestFlow Test Plan v1](specs/requestflow/test-plan.md): human QA test design,
+  traceability and canonical test candidates
 - [ADR-0001](docs/adr/0001-ai-outside-test-runtime.md): AI agents are outside the deterministic
   Playwright runtime

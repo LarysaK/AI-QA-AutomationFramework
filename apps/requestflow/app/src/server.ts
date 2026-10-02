@@ -4,6 +4,7 @@ import { AppError } from './domain/errors';
 import { registerApiRoutes } from './http/api-routes';
 import { sendError, sendJson } from './http/responses';
 import { Router } from './http/router';
+import { registerTestRoutes } from './http/test-routes';
 import { registerUiRoutes, sendUiNotFound } from './http/ui-routes';
 import { AuthService } from './services/auth-service';
 import { RequestService } from './services/request-service';
@@ -15,9 +16,15 @@ export interface AppDependencies {
   readonly clock: Clock;
 }
 
+export interface AppOptions {
+  /** Registers test-only routes (see http/test-routes.ts). */
+  readonly testHooks: boolean;
+}
+
 /** Composes state, services and routes into an HTTP server (not yet listening). */
 export function createApp(
   deps: AppDependencies = { store: new MemoryStore(), clock: createMonotonicClock() },
+  options: AppOptions = { testHooks: false },
 ): Server {
   const auth = new AuthService(deps.store);
   const requests = new RequestService(deps.store, deps.clock);
@@ -28,6 +35,7 @@ export function createApp(
   });
   registerApiRoutes(router, { auth, requests });
   registerUiRoutes(router, { auth, requests });
+  if (options.testHooks) registerTestRoutes(router, deps.store);
 
   return createServer((req, res) => {
     void handle(router, req, res);

@@ -1,6 +1,8 @@
 export interface Config {
   readonly host: string;
   readonly port: number;
+  /** Enables test-only routes such as POST /__test/reset. Never enable outside automated tests. */
+  readonly testHooks: boolean;
 }
 
 const DEFAULT_HOST = '127.0.0.1';
@@ -10,6 +12,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   return {
     host: env['HOST'] ?? DEFAULT_HOST,
     port: parsePort(env['PORT']),
+    testHooks: env['REQUESTFLOW_TEST_HOOKS'] === '1',
   };
 }
 
