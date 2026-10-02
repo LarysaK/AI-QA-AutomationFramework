@@ -248,13 +248,13 @@ reference tests. Each one establishes a pattern (structure, locators, data handl
 assertions) that the Generator Agent will later follow when it proposes further tests from
 this inventory.
 
-| ID      | Title                            | Level | Covers                                |
-| ------- | -------------------------------- | ----- | ------------------------------------- |
-| CAN-001 | Employee creates a valid request | UI    | TC-001-17                             |
-| CAN-002 | Request validation boundaries    | API   | TC-001-03 – TC-001-12                 |
-| CAN-003 | Employee edits own draft         | API   | TC-002-01, TC-002-02, TC-002-04       |
-| CAN-004 | Request approval workflow        | E2E   | TC-005-08, TC-008-08 (approval path)  |
-| CAN-005 | Request rejection workflow       | E2E   | TC-006-12, TC-008-08 (rejection path) |
+| ID      | Title                            | Level | Covers                                                     |
+| ------- | -------------------------------- | ----- | ---------------------------------------------------------- |
+| CAN-001 | Employee creates a valid request | UI    | TC-001-17                                                  |
+| CAN-002 | Request validation boundaries    | API   | TC-001-02, TC-001-03 – TC-001-12                           |
+| CAN-003 | Employee edits own draft         | API   | TC-002-02, TC-002-04, TC-002-10                            |
+| CAN-004 | Request approval workflow        | E2E   | TC-003-08, TC-004-08, TC-005-08, TC-008-08 (approval path) |
+| CAN-005 | Request rejection workflow       | E2E   | TC-006-11, TC-006-12, TC-008-08 (rejection path)           |
 
 ### CAN-001 — Employee creates a valid request (UI)
 
@@ -271,7 +271,8 @@ boundary values.
 
 **Flow:** as Alex, one data table drives `POST /api/requests` over the title, description
 and amount partitions and boundaries of TC-001-03 – TC-001-12. Each row asserts the status
-code and, for rejections, `error.code` `VALIDATION_ERROR`.
+code and, for rejections, `error.code` `VALIDATION_ERROR`. The trimming rows (TC-001-02) also
+read the request back through `GET` to confirm the trimmed values were stored.
 
 ### CAN-003 — Employee edits own draft (API)
 
@@ -279,7 +280,12 @@ code and, for rejections, `error.code` `VALIDATION_ERROR`.
 
 **Flow:** Alex creates a DRAFT → partial PATCH of one field (only that field changes,
 `status` stays `DRAFT`, `createdAt` unchanged, `updatedAt` later) → PATCH with one valid and
-one invalid field returns `400`, and `GET` shows the request unchanged.
+one invalid field returns `400`, and `GET` shows the request unchanged → a separately created
+request is submitted, an edit of it returns `409`, and `GET` shows it unchanged.
+
+TC-002-04 names `0` as an example invalid amount. Any value from the same invalid partition,
+`amount ≤ 0`, exercises the scenario; CAN-003 uses `-1`. TC-002-01 (editing all three fields)
+remains in the inventory as a non-canonical scenario.
 
 ### CAN-004 — Request approval workflow (E2E)
 
@@ -293,7 +299,9 @@ browser context → the request appears in the Review queue → Jordan approves 
 
 **Purpose:** reference terminal transition and cross-role state propagation.
 
-**Flow:** Alex creates and submits a request → Jordan rejects it with a comment → Alex sees
+**Flow:** Alex creates and submits a request → Jordan's whitespace-only rejection comment is
+refused with visible validation feedback and the request stays `SUBMITTED` → Jordan rejects it
+with a comment → Alex sees
 `REJECTED` and the rejection comment on the request details → `GET /api/requests/:id`
 confirms `REJECTED` and `reviewComment`.
 
@@ -352,8 +360,8 @@ Precedence when several errors apply: **401 → 403 → 404 → 409 → 400** (T
 | ------- | --------------------- | --- | --- | --- | ----------------------- |
 | REQ-001 | TC-001-01 – TC-001-18 | 16  | 2   | 0   | CAN-001, CAN-002        |
 | REQ-002 | TC-002-01 – TC-002-11 | 10  | 1   | 0   | CAN-003                 |
-| REQ-003 | TC-003-01 – TC-003-08 | 7   | 1   | 0   | CAN-004, CAN-005 (step) |
-| REQ-004 | TC-004-01 – TC-004-08 | 7   | 1   | 0   | CAN-004 (step)          |
+| REQ-003 | TC-003-01 – TC-003-08 | 7   | 1   | 0   | CAN-004; CAN-005 (step) |
+| REQ-004 | TC-004-01 – TC-004-08 | 7   | 1   | 0   | CAN-004                 |
 | REQ-005 | TC-005-01 – TC-005-08 | 7   | 0   | 1   | CAN-004                 |
 | REQ-006 | TC-006-01 – TC-006-12 | 10  | 1   | 1   | CAN-005                 |
 | REQ-007 | TC-007-01 – TC-007-07 | 6   | 1   | 0   | —                       |

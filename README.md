@@ -60,8 +60,9 @@ The demo application under test, RequestFlow, contains no AI functionality eithe
 
 ## Current project status
 
-**Phase 0: Foundation (in progress).** The project skeleton, the demo application under test,
-the human QA test plan and the first canonical reference test are in place.
+**Phase 0: Foundation (in progress).** The human reference baseline is complete: requirements,
+the demo application under test, the human QA test plan and all five canonical reference tests.
+The AI agent layer has not been started.
 
 Foundation:
 
@@ -84,15 +85,20 @@ Demo application ([RequestFlow v1](#demo-application-requestflow)):
 
 Test design and reference tests:
 
+- [x] [RequestFlow Requirements v1.2](specs/requestflow/requirements.md) (frozen baseline)
 - [x] [Human QA test plan](specs/requestflow/test-plan.md) for REQ-001 – REQ-010
-- [x] CAN-001: Employee creates a valid request (passing)
-- [x] Playwright starts and resets RequestFlow automatically
+- [x] Five canonical reference tests, CAN-001 – CAN-005 (passing)
+- [x] Playwright `webServer` starts RequestFlow for the test run
+- [x] Deterministic state reset once per run (`globalSetup`)
 
 Not implemented yet:
 
-- [ ] Remaining canonical reference tests (CAN-002 – CAN-005)
-- [ ] Agent contracts (shared standard, artifact schemas)
-- [ ] AI agents: Planner / Generator / Analyzer / Healer
+- [ ] Agent Standard (shared rules for all agents)
+- [ ] Structured agent artifact schemas
+- [ ] Planner agent
+- [ ] Generator agent
+- [ ] Analyzer agent
+- [ ] Healer agent
 - [ ] LLM integration
 - [ ] External integrations (Jira, Azure DevOps, GitHub, MCP)
 
@@ -124,23 +130,28 @@ The [human QA test plan](specs/requestflow/test-plan.md) was written by hand, be
 exists. It derives the test inventory from the requirements and traces every scenario to a
 requirement ID (REQ-001 – REQ-010).
 
-**Canonical tests** are a small set of handwritten reference tests selected from that plan.
-They fix the patterns for structure, semantic locators, page objects, test data and
-assertions. In a later phase, the Generator Agent will follow these patterns when it proposes
-further tests. The agent does not exist yet.
+**Canonical tests** are five reference tests selected from that plan. They are human-designed
+and human-approved, and each one fixes a pattern for structure, locators, page objects, API
+usage, test data and assertions. In a later phase they will serve as examples and context for
+the Generator Agent when it proposes further tests. The agent does not exist yet.
 
-| Canonical test | Scenario                         | Level | Traceability                  | Status          |
-| -------------- | -------------------------------- | ----- | ----------------------------- | --------------- |
-| CAN-001        | Employee creates a valid request | UI    | REQ-001 → TC-001-17 → CAN-001 | Implemented     |
-| CAN-002        | Request validation boundaries    | API   | REQ-001 → TC-001-03 – 12      | Not implemented |
-| CAN-003        | Employee edits own draft         | API   | REQ-002 → TC-002-01, 02, 04   | Not implemented |
-| CAN-004        | Request approval workflow        | E2E   | REQ-005, REQ-008              | Not implemented |
-| CAN-005        | Request rejection workflow       | E2E   | REQ-006, REQ-008              | Not implemented |
+| Canonical test | Pattern                                               | Level | Test file                                                                                          |
+| -------------- | ----------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------- |
+| CAN-001        | UI create: forms and semantic locators                | UI    | [`ui/create-request.spec.ts`](tests/requestflow/ui/create-request.spec.ts)                         |
+| CAN-002        | API boundaries, data-driven                           | API   | [`api/create-request-validation.spec.ts`](tests/requestflow/api/create-request-validation.spec.ts) |
+| CAN-003        | API state mutation and atomicity                      | API   | [`api/edit-draft-request.spec.ts`](tests/requestflow/api/edit-draft-request.spec.ts)               |
+| CAN-004        | Multi-role approval workflow                          | E2E   | [`e2e/approve-request.spec.ts`](tests/requestflow/e2e/approve-request.spec.ts)                     |
+| CAN-005        | Multi-role rejection workflow, with review validation | E2E   | [`e2e/reject-request.spec.ts`](tests/requestflow/e2e/reject-request.spec.ts)                       |
 
-CAN-001 lives in
-[`tests/requestflow/ui/create-request.spec.ts`](tests/requestflow/ui/create-request.spec.ts)
-and is tagged `@REQ-001 @TC-001-17 @CAN-001`. Its page objects are in
-[`apps/requestflow/pages/`](apps/requestflow/pages/).
+Each test is tagged with its requirement, test case and canonical IDs (for example
+`@REQ-001 @TC-001-17 @CAN-001`), so `npx playwright test --grep @CAN-004` runs one pattern and
+`--grep @REQ-006` runs everything traced to a requirement. The full REQ → TC → CAN mapping is
+in [section 3 of the test plan](specs/requestflow/test-plan.md#3-canonical-automation-candidates).
+
+Test support lives next to the AUT, outside the application code:
+[`apps/requestflow/pages/`](apps/requestflow/pages/) (page objects),
+[`apps/requestflow/api/`](apps/requestflow/api/) (a thin API client) and
+[`apps/requestflow/data/`](apps/requestflow/data/) (demo users).
 
 ## Planned phases
 
