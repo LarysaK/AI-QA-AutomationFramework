@@ -26,6 +26,22 @@ export default tseslint.config(
   },
 
   {
+    // Agent-layer unit tests use the built-in Node test runner, whose test() and describe()
+    // return promises the runner itself tracks.
+    files: ['agents/**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-floating-promises': [
+        'error',
+        {
+          allowForKnownSafeCalls: [
+            { from: 'package', package: 'node:test', name: ['test', 'describe', 'it', 'suite'] },
+          ],
+        },
+      ],
+    },
+  },
+
+  {
     files: ['**/*.mjs', '**/*.js'],
     ...tseslint.configs.disableTypeChecked,
   },
