@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -74,6 +75,9 @@ before(() => {
     'specs/requestflow/test-plan.md': TEST_PLAN,
     [EXISTING_TEST]: "test('submit', { tag: ['@REQ-003', '@TC-003-01'] }, () => {});\n",
   });
+  // G-STATIC lists files through Git and links node_modules.
+  execFileSync('git', ['init', '-q'], { cwd: repoRoot });
+  mkdirSync(join(repoRoot, 'node_modules'));
 });
 
 after(() => {
@@ -285,7 +289,7 @@ describe('G-TRACE: passing', () => {
     assert.equal(result.status, 'passed', JSON.stringify(result.failures));
   });
 
-  test('passes all four guards end to end', () => {
+  test('passes all guards end to end', () => {
     const results = validateArtifact(
       {
         artifactType: 'test-proposal',
@@ -316,11 +320,24 @@ describe('G-TRACE: passing', () => {
         ],
         payload: {},
       },
-      { repoRoot, schemaPath: resolve(ENVELOPE_SCHEMA_PATH) },
+      {
+        repoRoot,
+        schemaPath: resolve(ENVELOPE_SCHEMA_PATH),
+        runScript: () => ({ exitCode: 0, output: '', timedOut: false }),
+      },
     );
     assert.deepEqual(
       results.map((result) => `${result.guard}:${result.status}`),
-      ['G-SCHEMA:passed', 'G-PATHS:passed', 'G-BASE:passed', 'G-TRACE:passed'],
+      [
+        'G-SCHEMA:passed',
+        'G-PATHS:passed',
+        'G-BASE:passed',
+        'G-TRACE:passed',
+        'G-STATIC:passed',
+        // No execution authorization is given here; G-DISCOVERY is covered in its own tests.
+        'G-DISCOVERY:not-authorized',
+        'G-RUN:not-authorized',
+      ],
     );
   });
 });

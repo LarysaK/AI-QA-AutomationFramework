@@ -15,6 +15,7 @@ import { after, before, describe, test } from 'node:test';
 
 import { gitBlobSha } from './base-guard';
 import { checkPaths } from './path-guard';
+import type { ScriptRunner } from './static-guard';
 import type { Artifact, GuardName, GuardResult } from './types';
 import { ENVELOPE_SCHEMA_PATH, validateArtifact } from './validate';
 
@@ -78,6 +79,9 @@ before(() => {
   }
   // A directory inside tests/ that points outside the repository.
   symlinkSync(outsideDir, join(repoRoot, 'tests/escape'));
+  // G-STATIC lists files through Git and links node_modules.
+  execFileSync('git', ['init', '-q'], { cwd: repoRoot });
+  mkdirSync(join(repoRoot, 'node_modules'));
 });
 
 after(() => {
@@ -135,8 +139,15 @@ function shaOf(path: string): string {
   return gitBlobSha(readFileSync(join(repoRoot, path)));
 }
 
+/** G-STATIC's real checks are covered in static-guard.test.ts; here every script passes. */
+const passingScripts: ScriptRunner = () => ({ exitCode: 0, output: '', timedOut: false });
+
 function validate(document: unknown): GuardResult[] {
-  return validateArtifact(document, { repoRoot, schemaPath: SCHEMA_PATH });
+  return validateArtifact(document, {
+    repoRoot,
+    schemaPath: SCHEMA_PATH,
+    runScript: passingScripts,
+  });
 }
 
 function statusOf(results: readonly GuardResult[], guard: GuardName): string | undefined {
@@ -163,7 +174,15 @@ function assertFailed(
     ),
     `${guard} should report ${ruleId}${path === undefined ? '' : ` for ${path}`}:\n${JSON.stringify(result.failures, null, 2)}`,
   );
-  const order: GuardName[] = ['G-SCHEMA', 'G-PATHS', 'G-BASE', 'G-TRACE'];
+  const order: GuardName[] = [
+    'G-SCHEMA',
+    'G-PATHS',
+    'G-BASE',
+    'G-TRACE',
+    'G-STATIC',
+    'G-DISCOVERY',
+    'G-RUN',
+  ];
   for (const later of order.slice(order.indexOf(guard) + 1)) {
     assert.equal(
       statusOf(results, later),
@@ -191,7 +210,7 @@ describe('passing proposals', () => {
     const results = validate(artifact());
     assert.deepEqual(
       results.map((result) => result.status),
-      ['passed', 'passed', 'passed', 'passed'],
+      ['passed', 'passed', 'passed', 'passed', 'passed', 'not-authorized', 'not-authorized'],
     );
   });
 
@@ -212,7 +231,7 @@ describe('passing proposals', () => {
     );
     assert.deepEqual(
       results.map((result) => result.status),
-      ['passed', 'passed', 'passed', 'passed'],
+      ['passed', 'passed', 'passed', 'passed', 'passed', 'not-authorized', 'not-authorized'],
     );
   });
 
@@ -301,6 +320,37 @@ describe('G-PATHS', () => {
     );
     assertFailed(results, 'G-PATHS', 'STD-AUTH-002', path);
     assert.match(results[1]?.failures[0]?.reason ?? '', /requires "support-change"/);
+  });
+
+  for (const path of [
+    'tests/requestflow/tsconfig.json',
+    'tests/requestflow/eslint.config.mjs',
+    'tests/requestflow/playwright.config.ts',
+    'tests/requestflow/helper.js',
+    'tests/requestflow/helpers.ts',
+    'tests/requestflow/api/legacy.spec.js',
+  ]) {
+    test(`rejects a non-test file under tests/: ${path}`, () => {
+      const results = validate(artifact({ proposedChanges: [change({ path })] }));
+      assertFailed(results, 'G-PATHS', 'STD-AUTH-002', path);
+      assert.match(results[1]?.failures[0]?.reason ?? '', /only TypeScript Playwright test files/);
+    });
+  }
+
+  test('accepts *.spec.ts and *.test.ts files under tests/', () => {
+    for (const path of [
+      'tests/requestflow/api/x.spec.ts',
+      'tests/requestflow/deep/nested/y.test.ts',
+    ]) {
+      const result = checkPaths(
+        {
+          agent: { name: 'generator' },
+          proposedChanges: [{ path, changeKind: 'test-change', operation: 'create' }],
+        },
+        repoRoot,
+      );
+      assert.equal(result.status, 'passed', `${path}: ${JSON.stringify(result.failures)}`);
+    }
   });
 
   test('rejects paths outside every allowed class (default deny)', () => {

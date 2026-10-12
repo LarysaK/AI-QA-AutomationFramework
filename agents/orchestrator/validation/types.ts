@@ -2,7 +2,8 @@
  * Shared types for the deterministic guards (Agent Standard v1, section 14: Guards).
  */
 
-export type GuardName = 'G-SCHEMA' | 'G-PATHS' | 'G-BASE' | 'G-TRACE';
+export type GuardName =
+  'G-SCHEMA' | 'G-PATHS' | 'G-BASE' | 'G-TRACE' | 'G-STATIC' | 'G-DISCOVERY' | 'G-RUN';
 
 export interface GuardFailure {
   readonly guard: GuardName;
@@ -15,8 +16,15 @@ export interface GuardFailure {
 
 export interface GuardResult {
   readonly guard: GuardName;
-  readonly status: 'passed' | 'failed' | 'skipped';
+  /**
+   * `skipped`: an earlier guard failed. `not-authorized`: an execution-capable guard was not run
+   * because no matching human execution authorization was given (STD-AUTH-005).
+   */
+  readonly status: 'passed' | 'failed' | 'skipped' | 'not-authorized';
+  /** Problems found; for `not-authorized`, the reason the guard was not run. */
   readonly failures: readonly GuardFailure[];
+  /** Informational lines, e.g. G-RUN's "no tests to run". */
+  readonly notes?: readonly string[];
 }
 
 export type AgentName = 'planner' | 'generator' | 'analyzer' | 'healer';

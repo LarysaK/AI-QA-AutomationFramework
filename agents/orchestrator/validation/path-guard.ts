@@ -37,6 +37,12 @@ const PROTECTED: readonly { readonly name: string; readonly matches: (path: stri
     { name: 'ADR', matches: (p) => /^docs\/adr\//i.test(p) },
   ];
 
+/**
+ * Test class: TypeScript Playwright test files only. Configuration, helpers and JavaScript
+ * files under tests/ are not test changes; shared test support belongs in the Support class.
+ */
+export const TEST_CLASS_FILE = /^tests\/(?:[^/]+\/)*[^/]+\.(spec|test)\.ts$/;
+
 /** Allowed classes, matched exactly. */
 const ALLOWED: readonly {
   readonly name: string;
@@ -52,7 +58,7 @@ const ALLOWED: readonly {
   },
   {
     name: 'Test',
-    matches: (p) => p.startsWith('tests/'),
+    matches: (p) => TEST_CLASS_FILE.test(p),
     changeKind: 'test-change',
     permits: { generator: ['create'], healer: ['modify'] },
   },
@@ -108,6 +114,13 @@ export function checkPaths(artifact: Artifact, repoRoot: string): GuardResult {
     }
 
     const allowedClass = ALLOWED.find((entry) => entry.matches(path));
+    if (!allowedClass && path.startsWith('tests/')) {
+      fail(
+        path,
+        'only TypeScript Playwright test files (*.spec.ts, *.test.ts) may be proposed under tests/',
+      );
+      continue;
+    }
     if (!allowedClass) {
       fail(path, 'path is not in any allowed path class (default deny)');
       continue;

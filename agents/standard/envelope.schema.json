@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "agents/standard/envelope.schema.json",
   "title": "Agent artifact envelope",
-  "description": "Common envelope for every agent artifact (Agent Standard v1.1, section 9: Artifact envelope). Agent-specific content goes in `payload` and is validated by that agent's own schema.",
+  "description": "Common envelope for every agent artifact (Agent Standard v1.2, section 9: Artifact envelope). Agent-specific content goes in `payload` and is validated by that agent's own schema.",
   "type": "object",
   "additionalProperties": false,
   "required": [

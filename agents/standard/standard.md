@@ -1,8 +1,8 @@
-# Agent Standard v1.1
+# Agent Standard v1.2
 
 | Item            | Value                                                                 |
 | --------------- | --------------------------------------------------------------------- |
-| Standard        | `1.1` (see [revision history](#17-revision-history))                  |
+| Standard        | `1.2` (see [revision history](#17-revision-history))                  |
 | Envelope schema | [`envelope.schema.json`](envelope.schema.json), `schemaVersion` `1.0` |
 | Applies to      | Planner, Generator, Analyzer, Healer, and the orchestrator            |
 | Builds on       | [ADR-0001](../../docs/adr/0001-ai-outside-test-runtime.md)            |
@@ -163,14 +163,14 @@ requirements or test cases use the same markers. It never changes the markers th
 
 **READ → PROPOSE → STAGE → VALIDATE → APPROVE → APPLY**
 
-| Stage    | Owner                     | What happens                                                                    |
-| -------- | ------------------------- | ------------------------------------------------------------------------------- |
-| READ     | Agent, orchestrator       | Repository files and run outputs are read; never secrets (STD-SEC-001)          |
-| PROPOSE  | Agent                     | The agent returns one artifact. It has no write access to the repository        |
-| STAGE    | Orchestrator              | The artifact is written to `artifacts/proposals/<taskId>/`                      |
-| VALIDATE | Orchestrator              | Guards run deterministically; results are recorded separately from the artifact |
-| APPROVE  | Human                     | The human reviews the artifact, the generated diff and the validation record    |
-| APPLY    | Orchestrator, on approval | Approved changes are applied to a branch; the human commits and merges as usual |
+| Stage    | Owner                     | What happens                                                                                                                                                    |
+| -------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| READ     | Agent, orchestrator       | Repository files and run outputs are read; never secrets (STD-SEC-001)                                                                                          |
+| PROPOSE  | Agent                     | The agent returns one artifact. It has no write access to the repository                                                                                        |
+| STAGE    | Orchestrator              | The artifact is written to `artifacts/proposals/<taskId>/`                                                                                                      |
+| VALIDATE | Orchestrator; human at H7 | Guards run deterministically; results are recorded separately from the artifact. Execution-capable guards run only after the human execution authorization (H7) |
+| APPROVE  | Human                     | The human reviews the artifact, the generated diff and the validation record                                                                                    |
+| APPLY    | Orchestrator, on approval | Approved changes are applied to a branch; the human commits and merges as usual                                                                                 |
 
 **STD-AUTH-001 [G]** Agents never write to the repository. The only location AI output is
 written to is `artifacts/proposals/<taskId>/`, and only the orchestrator writes it. Only the
@@ -187,6 +187,14 @@ exist. _Guard: G-BASE._
 **STD-AUTH-004 [G]** Validation never mutates approved repository state. How validation is
 isolated is an orchestrator implementation decision. _Enforced by the orchestrator's design._
 
+**STD-AUTH-005 [G]** An execution-capable guard (one that imports or runs proposed code:
+G-DISCOVERY, G-RUN) runs only after a human execution authorization (gate H7) bound to the exact
+artifact bytes: the SHA-256 of the raw artifact file. Any change to the artifact invalidates the
+authorization. The authorization is supplied by the human outside the artifact; it is never read
+from the artifact or from environment variables. It is a human checkpoint, not proof of code
+review. A temporary directory, a restricted environment or a timeout is not a security sandbox.
+_Enforced by the orchestrator's design._
+
 ### 6.2 Path classes
 
 Default: **deny**. A change is allowed only if its path is in a class below and the agent and
@@ -196,11 +204,15 @@ Default: **deny**. A change is allowed only if its path is in a class below and 
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------- | ----------------------------------- |
 | Protected | `specs/**/requirements.md`; any file containing a `@CAN-` test; `apps/*/app/**` (AUT source); `playwright.config.ts`, `package.json`, `package-lock.json`, `tsconfig.json`, `eslint.config.mjs`; `.env*`; `agents/**`; `docs/adr/**` | —                | None. Humans only, by normal PRs.   |
 | Plan      | `specs/**/test-plan.md`                                                                                                                                                                                                              | `plan-change`    | Planner                             |
-| Test      | `tests/**`, except Protected files                                                                                                                                                                                                   | `test-change`    | Generator (create), Healer (modify) |
+| Test      | TypeScript Playwright test files `tests/**/*.spec.ts` and `tests/**/*.test.ts`, except Protected files                                                                                                                               | `test-change`    | Generator (create), Healer (modify) |
 | Support   | `apps/*/pages/**`, `apps/*/api/**`, `apps/*/data/**`                                                                                                                                                                                 | `support-change` | Generator, Healer                   |
 
 A Generator never changes the application under test to make a generated test pass; the
 Protected class makes this mechanical.
+
+Other files under `tests/` (configuration such as `tsconfig.json`, `eslint.config.mjs` or
+`playwright.config.ts`, helpers, JavaScript files) belong to no class and are therefore denied.
+Shared test support belongs in the Support class.
 
 ---
 
@@ -225,14 +237,15 @@ not change after staging.
 Set only by the orchestrator, in its own record for the task. Never part of the agent's
 output.
 
-| Status              | Set at stage | Meaning                                                                                                 |
-| ------------------- | ------------ | ------------------------------------------------------------------------------------------------------- |
-| `STAGED`            | STAGE        | The artifact is stored under `artifacts/proposals/<taskId>/`                                            |
-| `VALIDATION_FAILED` | VALIDATE     | A guard failed; the record names the guard, the rule IDs and the reason (for example a stale `baseSha`) |
-| `VALIDATED`         | VALIDATE     | All required guards passed                                                                              |
-| `APPROVED`          | APPROVE      | A human approved the validated artifact                                                                 |
-| `REJECTED`          | APPROVE      | A human rejected the artifact                                                                           |
-| `APPLIED`           | APPLY        | The approved changes were applied                                                                       |
+| Status                             | Set at stage | Meaning                                                                                                                                                    |
+| ---------------------------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `STAGED`                           | STAGE        | The artifact is stored under `artifacts/proposals/<taskId>/`                                                                                               |
+| `VALIDATION_FAILED`                | VALIDATE     | A guard failed; the record names the guard, the rule IDs and the reason (for example a stale `baseSha`)                                                    |
+| `EXECUTION_AUTHORIZATION_REQUIRED` | VALIDATE     | Every guard that does not run proposed code passed; execution-capable guards have not run because no matching human execution authorization (H7) was given |
+| `VALIDATED`                        | VALIDATE     | All required guards passed, including every execution-capable guard                                                                                        |
+| `APPROVED`                         | APPROVE      | A human approved the validated artifact                                                                                                                    |
+| `REJECTED`                         | APPROVE      | A human rejected the artifact                                                                                                                              |
+| `APPLIED`                          | APPLY        | The approved changes were applied                                                                                                                          |
 
 Only an artifact with agent status `READY` is eligible to be applied. Artifacts with
 `BLOCKED` or `NEEDS_HUMAN_DECISION` are staged for review; once the human has supplied the
@@ -242,14 +255,19 @@ missing context or decision, the task is run again.
 
 ## 8. Human approval gates
 
-| Gate | Requires human approval                                            |
-| ---- | ------------------------------------------------------------------ |
-| H1   | Test-plan changes, including provisional TC IDs (Planner)          |
-| H2   | Generated test and support changes, after validation (Generator)   |
-| H3   | Healing patches, after validation (Healer)                         |
-| H4   | Requirements changes — humans only; agents may only raise findings |
-| H5   | Creating, changing or promoting a canonical test — humans only     |
-| H6   | Changes to this standard, agent definitions or ADRs — humans only  |
+| Gate | Requires human approval                                                                                      |
+| ---- | ------------------------------------------------------------------------------------------------------------ |
+| H1   | Test-plan changes, including provisional TC IDs (Planner)                                                    |
+| H2   | Generated test and support changes, after validation (Generator)                                             |
+| H3   | Healing patches, after validation (Healer)                                                                   |
+| H4   | Requirements changes — humans only; agents may only raise findings                                           |
+| H5   | Creating, changing or promoting a canonical test — humans only                                               |
+| H6   | Changes to this standard, agent definitions or ADRs — humans only                                            |
+| H7   | Execution authorization: before any execution-capable guard runs proposed code for validation (STD-AUTH-005) |
+
+H7 is distinct from H2 and H3: authorizing execution lets proposed code run for validation in
+the temporary proposed state; it does not approve applying the changes, which still requires a
+fully `VALIDATED` artifact and H2 or H3.
 
 No approval is needed for context discovery, Analyzer reports, validation runs, or discarding
 an artifact.
@@ -379,29 +397,30 @@ artifacts. Run evidence is quoted only as far as needed; traces are referenced b
 
 ## 14. Rule index
 
-| Rule         | Summary                                                          | Marker | Enforcement                  |
-| ------------ | ---------------------------------------------------------------- | ------ | ---------------------------- |
-| STD-SRC-001  | Two hierarchies; explicit statements win; conflicts escalated    | J      | Reviewer                     |
-| STD-SRC-002  | App/requirement conflict → defect candidate, never matched       | J      | Reviewer                     |
-| STD-CTX-001  | Mandatory context per task type                                  | J      | Reviewer                     |
-| STD-CTX-002  | Sources listed in `sourceReferences`                             | G      | G-SCHEMA                     |
-| STD-CTX-003  | Missing context → `BLOCKED`                                      | J      | Reviewer                     |
-| STD-TRC-001  | Cited IDs exist; no invention; provisional IDs only from Planner | G      | G-TRACE                      |
-| STD-TRC-002  | New tests tagged with their declared REQ and TC                  | G      | G-TRACE, G-DISCOVERY         |
-| STD-TRC-003  | No `@CAN` from agents; modified tests keep their tags            | G      | G-TRACE                      |
-| STD-TRC-004  | Specification proposals preserve the format contract (5.1)       | J      | Reviewer                     |
-| STD-AUTH-001 | Agents never write to the repository; only staging               | G      | Orchestrator design          |
-| STD-AUTH-002 | Path classes and `changeKind`; default deny                      | G      | G-PATHS                      |
-| STD-AUTH-003 | `baseSha` matches for every modified file                        | G      | G-BASE                       |
-| STD-AUTH-004 | Validation never mutates approved repository state               | G      | Orchestrator design          |
-| STD-ART-001  | Schema-valid envelope and payload                                | G      | G-SCHEMA                     |
-| STD-ART-002  | Support changes declare impact; full suite runs                  | G/J    | G-SCHEMA, G-RUN, reviewer    |
-| STD-UNC-001  | No guessing; use statuses and findings                           | J      | Reviewer                     |
-| STD-CAN-001  | Reuse pattern invariants, not data; canonical tests untouched    | J/G    | Reviewer, G-PATHS            |
-| STD-CAN-002  | No direct pattern → declare and justify                          | J      | Reviewer                     |
-| STD-TST-001  | Static checks, discovery and targeted run pass                   | G      | G-STATIC, G-DISCOVERY, G-RUN |
-| STD-TST-002  | Authoring conventions                                            | G/J    | G-STATIC (lint), reviewer    |
-| STD-SEC-001  | No secrets in prompts, artifacts or tests                        | J      | Reviewer                     |
+| Rule         | Summary                                                                          | Marker | Enforcement                  |
+| ------------ | -------------------------------------------------------------------------------- | ------ | ---------------------------- |
+| STD-SRC-001  | Two hierarchies; explicit statements win; conflicts escalated                    | J      | Reviewer                     |
+| STD-SRC-002  | App/requirement conflict → defect candidate, never matched                       | J      | Reviewer                     |
+| STD-CTX-001  | Mandatory context per task type                                                  | J      | Reviewer                     |
+| STD-CTX-002  | Sources listed in `sourceReferences`                                             | G      | G-SCHEMA                     |
+| STD-CTX-003  | Missing context → `BLOCKED`                                                      | J      | Reviewer                     |
+| STD-TRC-001  | Cited IDs exist; no invention; provisional IDs only from Planner                 | G      | G-TRACE                      |
+| STD-TRC-002  | New tests tagged with their declared REQ and TC                                  | G      | G-TRACE, G-DISCOVERY         |
+| STD-TRC-003  | No `@CAN` from agents; modified tests keep their tags                            | G      | G-TRACE                      |
+| STD-TRC-004  | Specification proposals preserve the format contract (5.1)                       | J      | Reviewer                     |
+| STD-AUTH-001 | Agents never write to the repository; only staging                               | G      | Orchestrator design          |
+| STD-AUTH-002 | Path classes and `changeKind`; default deny                                      | G      | G-PATHS                      |
+| STD-AUTH-003 | `baseSha` matches for every modified file                                        | G      | G-BASE                       |
+| STD-AUTH-004 | Validation never mutates approved repository state                               | G      | Orchestrator design          |
+| STD-AUTH-005 | Execution-capable guards only with H7 authorization for the exact artifact bytes | G      | Orchestrator design          |
+| STD-ART-001  | Schema-valid envelope and payload                                                | G      | G-SCHEMA                     |
+| STD-ART-002  | Support changes declare impact; full suite runs                                  | G/J    | G-SCHEMA, G-RUN, reviewer    |
+| STD-UNC-001  | No guessing; use statuses and findings                                           | J      | Reviewer                     |
+| STD-CAN-001  | Reuse pattern invariants, not data; canonical tests untouched                    | J/G    | Reviewer, G-PATHS            |
+| STD-CAN-002  | No direct pattern → declare and justify                                          | J      | Reviewer                     |
+| STD-TST-001  | Static checks, discovery and targeted run pass                                   | G      | G-STATIC, G-DISCOVERY, G-RUN |
+| STD-TST-002  | Authoring conventions                                                            | G/J    | G-STATIC (lint), reviewer    |
+| STD-SEC-001  | No secrets in prompts, artifacts or tests                                        | J      | Reviewer                     |
 
 Agent-specific rules use the prefixes `PLN-`, `GEN-`, `ANA-` and `HEA-` with the same
 numbering. Guard results and findings cite rule IDs. Rule IDs are never reused; a retired rule
@@ -409,17 +428,20 @@ stays in this index marked as retired.
 
 ### Guards (contract)
 
-| Guard       | Checks                                                                                         |
-| ----------- | ---------------------------------------------------------------------------------------------- |
-| G-SCHEMA    | Envelope, and payload once a payload schema exists                                             |
-| G-PATHS     | Path class and `changeKind` permitted for the agent; Protected untouched; default deny         |
-| G-BASE      | `modify` has a matching `baseSha`; `create` targets a non-existent file                        |
-| G-TRACE     | Cited IDs exist; new tests' tags match declared TCs; no `@CAN`; modified tests keep their tags |
-| G-STATIC    | `typecheck`, `lint` and `format:check` on the proposed state                                   |
-| G-DISCOVERY | `playwright test --list` contains the new tests with their declared tags                       |
-| G-RUN       | Targeted run by `--grep @TC-…`; the full suite when any `support-change` is present            |
+| Guard       | Checks                                                                                                                                                                                                   | Execution-capable |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| G-SCHEMA    | Envelope, and payload once a payload schema exists                                                                                                                                                       | No                |
+| G-PATHS     | Path class and `changeKind` permitted for the agent; Protected untouched; default deny                                                                                                                   | No                |
+| G-BASE      | `modify` has a matching `baseSha`; `create` targets a non-existent file                                                                                                                                  | No                |
+| G-TRACE     | Cited IDs exist; new tests' tags match declared TCs; no `@CAN`; modified tests keep their tags                                                                                                           | No                |
+| G-STATIC    | `typecheck`, `lint` and `format:check` on the proposed state                                                                                                                                             | No                |
+| G-DISCOVERY | `playwright test --list` contains the new tests with their declared tags                                                                                                                                 | **Yes**           |
+| G-RUN       | Targeted run of the proposed test files, filtered by their declared `@TC-…` tags; the full suite when any `support-change` is present; "no tests to run" when there are neither test nor support changes | **Yes**           |
 
-Guards run in this order and stop at the first failure.
+Guards run in this order and stop at the first failure. Execution-capable guards import or run
+proposed code (Playwright discovery imports proposed test modules and runs their top-level code)
+and run only after the human execution authorization (STD-AUTH-005, gate H7). Guards that are not
+execution-capable may still run approved tooling, plugins and configuration.
 
 ---
 
@@ -430,6 +452,25 @@ Guards run in this order and stop at the first failure.
 | Standard (`MAJOR.MINOR`, this file)    | A rule removed or its meaning changed; a new [G] rule that rejects previously valid artifacts; a hierarchy or authority change | Wording; a new [J] rule; a [J] rule upgraded to [G] that rejects nothing currently valid |
 | Envelope schema (`schemaVersion`)      | A required field added, removed or renamed; an enum value removed                                                              | An optional field; a new enum value                                                      |
 | Agent definition (`definitionVersion`) | Required payload fields, allowed path classes or minimum context changed                                                       | Wording, examples                                                                        |
+
+**Security-hardening restrictions (minor).** A change that only _narrows_ the Test path class
+(section 6.2) may be released as a minor revision, even though artifacts proposing the newly
+denied paths become invalid, only when all of the following hold:
+
+1. the artifact envelope schema is unchanged or changes only compatibly (no major
+   `schemaVersion` change);
+2. agent roles, the `changeKind`s and operations each agent may propose for its remaining
+   paths, the source-of-truth hierarchies (section 3) and the authority model (sections 6.1 and 8) are unchanged;
+3. the restriction closes a documented security or configuration-bypass risk;
+4. the revision history records the exact restriction, the risk it closes, and its
+   compatibility impact: which previously valid artifacts are now rejected.
+
+This covers such restrictions only. It never covers widening permissions, removing or changing
+other rules, or any other change that rejects previously valid artifacts; those remain breaking.
+
+**Human execution checkpoints.** Adding a human checkpoint that only further restricts what the
+orchestrator may run, without changing what agents may propose or how sources rank, is not an
+"authority change" for versioning purposes.
 
 Each agent definition declares the standard major version it requires. The orchestrator
 rejects artifacts with an unsupported major `schemaVersion` and definitions that require an
@@ -450,13 +491,16 @@ Deferred to later versions or to the orchestrator and agent definitions:
 - fingerprinting every context source;
 - agent payload schemas, minimum context per task type, agent rules, failure and fix
   categories, the provisional TC ID format;
-- a structured test-case format replacing Markdown parsing of the test plan.
+- a structured test-case format replacing Markdown parsing of the test plan;
+- running G-STATIC with the same minimal environment as the execution-capable guards;
+- a persistent record of execution authorizations (who authorized what, and when).
 
 ---
 
 ## 17. Revision history
 
-| Version | Change                                                                                                                                                                         |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1.1     | Added the specification format contract (5.1) and STD-TRC-004 [J]. Minor: documents the existing format and adds a judgment rule; no artifact valid under 1.0 becomes invalid. |
-| 1.0     | Initial frozen standard.                                                                                                                                                       |
+| Version | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.2     | Added STD-AUTH-005 [G], gate H7, the H7 checkpoint in the VALIDATE stage, the `EXECUTION_AUTHORIZATION_REQUIRED` pipeline status, and the execution-capable classification of G-DISCOVERY and G-RUN; minor under section 15 ("Human execution checkpoints"): the artifact envelope contract and agent capabilities are unchanged, and only the orchestrator gains an explicit human execution checkpoint. Narrowed the Test path class (6.2) from `tests/**` to TypeScript Playwright test files `tests/**/*.spec.ts` and `tests/**/*.test.ts`; minor under section 15 ("Security-hardening restrictions"). Risk closed: proposed configuration or helper files under `tests/` (for example a `tsconfig.json` that ESLint's TypeScript project service would pick up) could change how the approved checks treat proposed code. Compatibility impact: previously valid test-change proposals for any other file under `tests/` — configuration (`tsconfig.json`, `eslint.config.mjs`, `playwright.config.ts`), helpers (`*.ts` that are not `*.spec.ts`/`*.test.ts`) and JavaScript files (including `*.spec.js`) — are now rejected by G-PATHS. No approved workflow placed such files under `tests/`. |
+| 1.1     | Added the specification format contract (5.1) and STD-TRC-004 [J]. Minor: documents the existing format and adds a judgment rule; no artifact valid under 1.0 becomes invalid.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 1.0     | Initial frozen standard.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |

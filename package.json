@@ -15,7 +15,7 @@
     "format:check": "prettier --check .",
     "aut:start": "tsx apps/requestflow/app/src/main.ts",
     "agents:validate": "tsx agents/orchestrator/validation/cli.ts",
-    "agents:test": "tsx --test agents/orchestrator/validation/validate.test.ts agents/orchestrator/validation/trace-guard.test.ts"
+    "agents:test": "tsx --test agents/orchestrator/validation/validate.test.ts agents/orchestrator/validation/trace-guard.test.ts agents/orchestrator/validation/static-guard.test.ts agents/orchestrator/validation/discovery-guard.test.ts agents/orchestrator/validation/run-guard.test.ts agents/orchestrator/validation/cli.test.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
