@@ -1,0 +1,37 @@
+import { expect, test } from '@playwright/test';
+
+import {
+  type ApiErrorBody,
+  type ApiRequest,
+  RequestFlowApi,
+} from '../../../apps/requestflow/api/requestflow-api.client';
+import { DEMO_USERS } from '../../../apps/requestflow/data/demo-users';
+
+test.describe('REQ-003 Submit a request (API)', { tag: ['@REQ-003'] }, () => {
+  test(
+    'Submitting an already SUBMITTED request is rejected and changes nothing',
+    { tag: '@TC-003-07' },
+    async ({ request }) => {
+      const api = new RequestFlowApi(request);
+      await api.loginAs(DEMO_USERS.alex);
+      const created = await api.createRequest({
+        title: 'Conference ticket',
+        description: 'Annual QA conference',
+        amount: 120.5,
+      });
+      expect(created.status()).toBe(201);
+      const { id } = (await created.json()) as ApiRequest;
+      const first = await api.submitRequest(id);
+      expect(first.status()).toBe(200);
+      const submitted = (await first.json()) as ApiRequest;
+
+      const second = await api.submitRequest(id);
+
+      expect(second.status()).toBe(409);
+      expect(((await second.json()) as ApiErrorBody).error.code).toBe('INVALID_STATE_TRANSITION');
+      const retrieved = await api.getRequest(id);
+      expect(retrieved.status()).toBe(200);
+      expect((await retrieved.json()) as ApiRequest).toEqual(submitted);
+    },
+  );
+});

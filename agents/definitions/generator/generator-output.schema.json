@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agents/definitions/generator/generator-output.schema.json",
+  "title": "Generator model output",
+  "description": "What the Generator model returns (definition 1.0). Uses only the JSON Schema subset supported by structured outputs; stricter rules are enforced on the assembled envelope by G-SCHEMA.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "summary",
+    "testFile",
+    "canonicalPatterns",
+    "assumptions",
+    "findings",
+    "contextRequests"
+  ],
+  "properties": {
+    "status": { "enum": ["READY", "BLOCKED", "NEEDS_HUMAN_DECISION"] },
+    "summary": { "type": "string" },
+    "testFile": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "content", "rationale"],
+          "properties": {
+            "path": { "type": "string" },
+            "content": { "type": "string" },
+            "rationale": { "type": "string" }
+          }
+        },
+        { "type": "null" }
+      ]
+    },
+    "canonicalPatterns": { "type": "array", "items": { "type": "string" } },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["statement", "impact"],
+        "properties": {
+          "statement": { "type": "string" },
+          "impact": { "type": "string" }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "severity", "message"],
+        "properties": {
+          "kind": {
+            "enum": [
+              "conflict",
+              "ambiguity",
+              "gap",
+              "missing-context",
+              "defect-candidate",
+              "deviation",
+              "novel-pattern",
+              "risk"
+            ]
+          },
+          "severity": { "enum": ["info", "warning", "blocking"] },
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "contextRequests": { "type": "array", "items": { "type": "string" } }
+  }
+}

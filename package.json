@@ -15,9 +15,11 @@
     "format:check": "prettier --check .",
     "aut:start": "tsx apps/requestflow/app/src/main.ts",
     "agents:validate": "tsx agents/orchestrator/validation/cli.ts",
-    "agents:test": "tsx --test agents/orchestrator/validation/validate.test.ts agents/orchestrator/validation/trace-guard.test.ts agents/orchestrator/validation/static-guard.test.ts agents/orchestrator/validation/discovery-guard.test.ts agents/orchestrator/validation/run-guard.test.ts agents/orchestrator/validation/cli.test.ts"
+    "agents:test": "tsx --test agents/orchestrator/validation/validate.test.ts agents/orchestrator/validation/trace-guard.test.ts agents/orchestrator/validation/static-guard.test.ts agents/orchestrator/validation/discovery-guard.test.ts agents/orchestrator/validation/run-guard.test.ts agents/orchestrator/validation/cli.test.ts agents/orchestrator/generator/generator.test.ts agents/orchestrator/generator/eslint-boundary.test.ts",
+    "agents:generate": "tsx agents/orchestrator/generator/cli.ts"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.55.0",
     "@types/node": "^22.0.0",

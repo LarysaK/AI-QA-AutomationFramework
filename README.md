@@ -62,7 +62,8 @@ The demo application under test, RequestFlow, contains no AI functionality eithe
 
 **Phase 0: Foundation (in progress).** The human reference baseline is complete: requirements,
 the demo application under test, the human QA test plan and all five canonical reference tests.
-The AI agent layer has not been started.
+The agent layer has its standard, a seven-guard deterministic validator and a first Generator
+agent, validated offline; no live model output has been produced yet.
 
 Foundation:
 
@@ -91,15 +92,21 @@ Test design and reference tests:
 - [x] Playwright `webServer` starts RequestFlow for the test run
 - [x] Deterministic state reset once per run (`globalSetup`)
 
+Agent layer:
+
+- [x] [Agent Standard v1.2](agents/standard/standard.md) and the artifact envelope schema
+- [x] Deterministic validator with seven guards and human execution authorization (H7)
+- [x] [Generator agent v1](docs/generator-agent.md): one new test per approved test case,
+      staged and validated; offline demo for TC-003-07 passed all seven guards under H7
+- [x] ESLint import boundary: runtime code cannot import `agents/**` or the LLM SDK
+
 Not implemented yet:
 
-- [ ] Agent Standard (shared rules for all agents)
-- [ ] Structured agent artifact schemas
+- [ ] A live Generator run (real model output)
 - [ ] Planner agent
-- [ ] Generator agent
 - [ ] Analyzer agent
 - [ ] Healer agent
-- [ ] LLM integration
+- [ ] Proposal approval and apply workflow
 - [ ] External integrations (Jira, Azure DevOps, GitHub, MCP)
 
 ## Demo application: RequestFlow
@@ -268,15 +275,18 @@ Test results, HTML reports, and traces, screenshots and videos of failed tests a
 
 ### Available scripts
 
-| Script                 | Purpose                                             |
-| ---------------------- | --------------------------------------------------- |
-| `npm run aut:start`    | Start RequestFlow locally                           |
-| `npm test`             | Start RequestFlow and run Playwright tests headless |
-| `npm run test:headed`  | Same, in a visible browser                          |
-| `npm run lint`         | ESLint                                              |
-| `npm run typecheck`    | TypeScript type check                               |
-| `npm run format`       | Format with Prettier                                |
-| `npm run format:check` | Verify formatting                                   |
+| Script                    | Purpose                                                                  |
+| ------------------------- | ------------------------------------------------------------------------ |
+| `npm run aut:start`       | Start RequestFlow locally                                                |
+| `npm test`                | Start RequestFlow and run Playwright tests headless                      |
+| `npm run test:headed`     | Same, in a visible browser                                               |
+| `npm run lint`            | ESLint                                                                   |
+| `npm run typecheck`       | TypeScript type check                                                    |
+| `npm run format`          | Format with Prettier                                                     |
+| `npm run format:check`    | Verify formatting                                                        |
+| `npm run agents:validate` | Validate an agent artifact (seven guards; H7 by `--authorize-execution`) |
+| `npm run agents:generate` | Generate one test proposal for an approved test case                     |
+| `npm run agents:test`     | Unit and integration tests of the agent layer                            |
 
 ## Documentation
 
@@ -286,3 +296,7 @@ Test results, HTML reports, and traces, screenshots and videos of failed tests a
   traceability and canonical test candidates
 - [ADR-0001](docs/adr/0001-ai-outside-test-runtime.md): AI agents are outside the deterministic
   Playwright runtime
+- [Agent Standard v1.2](agents/standard/standard.md): shared rules, guards and approval gates for
+  all agents
+- [Generator agent v1](docs/generator-agent.md): usage, context, validation, H7 and the offline
+  demo
