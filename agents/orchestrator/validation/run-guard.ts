@@ -89,25 +89,99 @@ export const runPlaywrightTests: TestRunner = (cwd, env, args) => {
   };
 };
 
-/** Port helpers run in a child Node process so the guard stays synchronous. */
-export function allocateFreePort(): number {
+/*
+ * Port helpers run in a child Node process so the guard stays synchronous. The child gets a
+ * minimal environment (no NODE_OPTIONS, preloads or debugger settings) and reports through one
+ * strict marker line, so other output on stdout cannot be mistaken for a result. Any unknown
+ * state throws: a port is never assumed to be free.
+ */
+export const PORT_HELPER_MARKER = 'AGENTS_PORT_HELPER';
+const PORT_HELPER_TIMEOUT_MS = 10_000;
+
+/** Runs a helper script and returns its marker value. Injectable for tests. */
+export type PortHelperRunner = (script: string, timeoutMs?: number) => string;
+
+export function portHelperEnvironment(parent: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  // Node needs SystemRoot for networking on Windows; nothing else is passed.
+  const systemRoot = parent['SystemRoot'];
+  return systemRoot === undefined ? {} : { SystemRoot: systemRoot };
+}
+
+export const runPortHelper: PortHelperRunner = (script, timeoutMs = PORT_HELPER_TIMEOUT_MS) => {
+  const result = spawnSync(process.execPath, ['-e', script], {
+    encoding: 'utf8',
+    env: portHelperEnvironment(),
+    timeout: timeoutMs,
+  });
+  const stderr = (result.stderr || '').trim().split('\n')[0] ?? '';
+  const detail = stderr === '' ? '' : `: ${stderr}`;
+  if (result.error) {
+    const timedOut = (result.error as NodeJS.ErrnoException).code === 'ETIMEDOUT';
+    throw new Error(
+      `port helper ${timedOut ? `timed out after ${String(timeoutMs)} ms` : `failed to start: ${result.error.message}`}`,
+    );
+  }
+  if (result.status !== 0)
+    throw new Error(`port helper exited with ${String(result.status)}${detail}`);
+  const values = [
+    ...(result.stdout || '').matchAll(new RegExp(`^${PORT_HELPER_MARKER}=(\\S+)$`, 'gm')),
+  ].map((match) => match[1] ?? '');
+  if (values.length !== 1) {
+    throw new Error(
+      `port helper reported ${String(values.length)} ${PORT_HELPER_MARKER} lines, expected exactly one${detail}`,
+    );
+  }
+  return values[0] ?? '';
+};
+
+export function allocateFreePort(run: PortHelperRunner = runPortHelper): number {
   const script =
-    "const s=require('net').createServer();s.listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})";
-  const port = Number(
-    spawnSync(process.execPath, ['-e', script], { encoding: 'utf8' }).stdout.trim(),
-  );
-  if (!Number.isInteger(port) || port <= 0) throw new Error('could not allocate a free local port');
+    "const s=require('net').createServer();" +
+    "s.on('error',e=>{console.error(e.message);process.exit(2)});" +
+    `s.listen(0,'127.0.0.1',()=>{const p=s.address().port;s.close(()=>console.log('${PORT_HELPER_MARKER}='+p))})`;
+  let value: string;
+  try {
+    value = run(script);
+  } catch (error) {
+    throw new Error(
+      `could not allocate a free local port (${error instanceof Error ? error.message : String(error)})`,
+      { cause: error },
+    );
+  }
+  const port = Number(value);
+  if (!/^\d+$/.test(value) || !isValidPort(port)) {
+    throw new Error(`could not allocate a free local port (helper reported "${value}")`);
+  }
   return port;
 }
 
-export function isLocalPortOpen(port: number): boolean {
-  const script = `const c=require('net').connect(${String(port)},'127.0.0.1');c.on('connect',()=>{console.log('open');c.destroy()});c.on('error',()=>console.log('closed'))`;
-  return (
-    spawnSync(process.execPath, ['-e', script], {
-      encoding: 'utf8',
-      timeout: 10_000,
-    }).stdout.trim() === 'open'
+/** True if something accepts connections; false only on ECONNREFUSED; anything else throws. */
+export function isLocalPortOpen(port: number, run: PortHelperRunner = runPortHelper): boolean {
+  if (!isValidPort(port))
+    throw new Error(`cannot check port "${String(port)}": not a valid TCP port`);
+  const script =
+    `const c=require('net').connect(${String(port)},'127.0.0.1');c.setTimeout(5000);` +
+    `c.on('connect',()=>{console.log('${PORT_HELPER_MARKER}=open');c.destroy()});` +
+    "c.on('timeout',()=>{console.error('connect timed out');process.exit(3)});" +
+    `c.on('error',e=>{if(e.code==='ECONNREFUSED'){console.log('${PORT_HELPER_MARKER}=closed')}else{console.error(e.code||e.message);process.exit(2)}})`;
+  let value: string;
+  try {
+    value = run(script);
+  } catch (error) {
+    throw new Error(
+      `could not determine whether port ${String(port)} is in use (${error instanceof Error ? error.message : String(error)})`,
+      { cause: error },
+    );
+  }
+  if (value === 'open') return true;
+  if (value === 'closed') return false;
+  throw new Error(
+    `could not determine whether port ${String(port)} is in use (helper reported "${value}")`,
   );
+}
+
+function isValidPort(port: number): boolean {
+  return Number.isInteger(port) && port >= 1 && port <= 65535;
 }
 
 const REAL: RunDependencies = {

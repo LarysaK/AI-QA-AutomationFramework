@@ -1,16 +1,21 @@
 import assert from 'node:assert/strict';
-import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, test } from 'node:test';
 
 import type { ListRunner } from './discovery-guard';
 import {
+  allocateFreePort,
   checkRun,
   isLocalPortOpen,
+  PORT_HELPER_MARKER,
+  portHelperEnvironment,
   type RunDependencies,
   runPlaywrightTests,
+  runPortHelper,
   type RunResult,
   type TestRunner,
 } from './run-guard';
@@ -152,6 +157,50 @@ function realRun(
   return { result, call };
 }
 
+/**
+ * A process that listens on a free local port until stopped. Same clean environment and marker
+ * protocol as the port helpers; rejects instead of hanging if it exits or stays silent.
+ */
+async function startBlocker(): Promise<{ port: number; stop: () => void }> {
+  const child = spawn(
+    process.execPath,
+    [
+      '-e',
+      "const s=require('net').createServer(c=>c.end());" +
+        "s.on('error',e=>{console.error(e.message);process.exit(2)});" +
+        `s.listen(0,'127.0.0.1',()=>console.log('${PORT_HELPER_MARKER}='+s.address().port))`,
+    ],
+    { env: portHelperEnvironment() },
+  );
+  const stop = (): void => {
+    child.kill();
+  };
+  try {
+    const port = await new Promise<number>((done, fail) => {
+      let output = '';
+      const timer = setTimeout(() => {
+        fail(new Error('blocker did not report its port within 10 s'));
+      }, 10_000);
+      child.stdout.on('data', (data: Buffer) => {
+        output += String(data);
+        const match = new RegExp(`^${PORT_HELPER_MARKER}=(\\d+)$`, 'm').exec(output);
+        if (match) {
+          clearTimeout(timer);
+          done(Number(match[1]));
+        }
+      });
+      child.once('exit', (code) => {
+        clearTimeout(timer);
+        fail(new Error(`blocker exited with ${String(code)} before reporting its port`));
+      });
+    });
+    return { port, stop };
+  } catch (error) {
+    stop();
+    throw error;
+  }
+}
+
 // ---------------------------------------------------------------- real runs (AUT started)
 
 describe('G-RUN: real runs with the AUT', () => {
@@ -270,16 +319,9 @@ describe('G-RUN: real runs with the AUT', () => {
   });
 
   test('a port collision is a validation failure, never a reused server', async () => {
-    const blocker: ChildProcess = spawn(process.execPath, [
-      '-e',
-      "const s=require('net').createServer(c=>c.end()).listen(0,'127.0.0.1',()=>console.log(s.address().port))",
-    ]);
+    const blocker = await startBlocker();
     try {
-      const port = await new Promise<number>((done) => {
-        blocker.stdout?.once('data', (data: Buffer) => {
-          done(Number(String(data).trim()));
-        });
-      });
+      const { port } = blocker;
       const { runTests, calls } = recordingRunner();
       const result = checkRun(
         proposal(testChange(spec(...REVIEWER_CREATE(403)), TC_001_15)),
@@ -297,7 +339,7 @@ describe('G-RUN: real runs with the AUT', () => {
       );
       assert.equal(calls.length, 0, 'Playwright is not started on a taken port');
     } finally {
-      blocker.kill();
+      blocker.stop();
     }
   });
 
@@ -313,6 +355,129 @@ describe('G-RUN: real runs with the AUT', () => {
       'tool caches were written inside the copy',
     );
     assert.equal(fingerprint(REPO), repoBefore);
+  });
+});
+
+// ---------------------------------------------------------------- port helpers
+
+describe('G-RUN: port helpers', () => {
+  test('ignore a NODE_OPTIONS preload that writes to stdout', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'agents-port-preload-'));
+    const saved = process.env['NODE_OPTIONS'];
+    const blocker = await startBlocker();
+    try {
+      writeFileSync(join(dir, 'noisy.cjs'), 'console.log("[preload] noise on stdout 12345");\n');
+      process.env['NODE_OPTIONS'] = `--require ${join(dir, 'noisy.cjs')}`;
+      // Precondition: a child that inherits the environment really is noisy.
+      const inherited = spawnSync(process.execPath, ['-e', 'console.log(1)'], { encoding: 'utf8' });
+      assert.match(inherited.stdout, /\[preload\] noise/);
+
+      const port = allocateFreePort();
+      assert.ok(Number.isInteger(port) && port >= 1 && port <= 65535, String(port));
+      assert.equal(isLocalPortOpen(port), false, 'a freshly allocated port is free');
+      assert.equal(isLocalPortOpen(blocker.port), true, 'a listening port is reported open');
+    } finally {
+      blocker.stop();
+      if (saved === undefined) Reflect.deleteProperty(process.env, 'NODE_OPTIONS');
+      else process.env['NODE_OPTIONS'] = saved;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('the helper environment excludes NODE_OPTIONS and everything else but SystemRoot', () => {
+    const parent = {
+      NODE_OPTIONS: '--inspect',
+      PATH: '/bin',
+      ANTHROPIC_API_KEY: 'k',
+      SystemRoot: 'C:\\Windows',
+    };
+    assert.deepEqual(portHelperEnvironment(parent), { SystemRoot: 'C:\\Windows' });
+    assert.deepEqual(portHelperEnvironment({ NODE_OPTIONS: '--inspect' }), {});
+  });
+
+  test('the marker protocol: only one exact marker line counts', () => {
+    assert.equal(
+      runPortHelper(
+        `console.log('noise');console.log('${PORT_HELPER_MARKER}=42');console.log('more noise')`,
+      ),
+      '42',
+    );
+    assert.throws(
+      () => runPortHelper("console.log('12345')"),
+      /reported 0 AGENTS_PORT_HELPER lines/,
+    );
+    assert.throws(
+      () =>
+        runPortHelper(
+          `console.log('${PORT_HELPER_MARKER}=1');console.log('${PORT_HELPER_MARKER}=2')`,
+        ),
+      /reported 2 AGENTS_PORT_HELPER lines/,
+    );
+    assert.throws(
+      () => runPortHelper(`console.log(' ${PORT_HELPER_MARKER}=1')`),
+      /reported 0/,
+      'no partial-line matches',
+    );
+  });
+
+  test('a failing, crashing or hanging helper throws', () => {
+    assert.throws(
+      () => runPortHelper("console.error('listen EPERM');process.exit(2)"),
+      /exited with 2: listen EPERM/,
+    );
+    assert.throws(() => runPortHelper("throw new Error('boom')"), /exited with 1/);
+    assert.throws(() => runPortHelper('setTimeout(()=>{},60000)', 300), /timed out after 300 ms/);
+  });
+
+  test('malformed or unknown results fail closed', () => {
+    for (const value of ['abc', '0', '70000', '1.5', '-1']) {
+      assert.throws(
+        () => allocateFreePort(() => value),
+        /could not allocate a free local port \(helper reported/,
+      );
+    }
+    assert.throws(
+      () =>
+        allocateFreePort(() => {
+          throw new Error('helper crashed');
+        }),
+      /could not allocate a free local port \(helper crashed\)/,
+    );
+    assert.throws(
+      () => isLocalPortOpen(3100, () => 'maybe'),
+      /could not determine whether port 3100 is in use/,
+    );
+    assert.throws(
+      () =>
+        isLocalPortOpen(3100, () => {
+          throw new Error('helper crashed');
+        }),
+      /could not determine whether port 3100 is in use \(helper crashed\)/,
+      'an unknown state is never reported as free',
+    );
+    assert.throws(() => isLocalPortOpen(Number.NaN), /not a valid TCP port/);
+    assert.throws(() => isLocalPortOpen(0), /not a valid TCP port/);
+  });
+
+  test('an unknown port state stops G-RUN and the copy is still removed', () => {
+    let copy = '';
+    const capture: ListRunner = (cwd, env) => {
+      copy = cwd;
+      return listStub([A, B])(cwd, env);
+    };
+    assert.throws(
+      () =>
+        checkRun(fileProposal, REPO, {
+          ...stubDeps(runStub([A, B])),
+          runList: capture,
+          isPortOpen: () => {
+            throw new Error('could not determine whether port 45678 is in use');
+          },
+        }),
+      /could not determine whether port 45678 is in use/,
+    );
+    assert.ok(copy !== '');
+    assert.equal(existsSync(copy), false, 'the temporary copy is removed');
   });
 });
 
