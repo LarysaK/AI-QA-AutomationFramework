@@ -6,7 +6,14 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['node_modules/', 'artifacts/', 'playwright-report/', 'test-results/'],
+    // reporting/dashboard/ is a standalone browser package with its own lint configuration.
+    ignores: [
+      'node_modules/',
+      'artifacts/',
+      'playwright-report/',
+      'test-results/',
+      'reporting/dashboard/',
+    ],
   },
 
   eslint.configs.recommended,

@@ -1,12 +1,10 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
-import Ajv2020, { type ErrorObject } from 'ajv/dist/2020';
-
 import type { ListRunner } from '../../agents/orchestrator/validation/discovery-guard';
 import { discoverInventory, type GitProbe, gitProbe, type TestInstance } from './inventory';
 import { defaultSafetyContext, type PublicSafetyContext, publicSafetyFindings } from './sanitize';
 import { readSpecSources, SnapshotError } from './spec-source';
+import { SCHEMA_VERSION, validateSnapshot } from './validate';
+
+export { SCHEMA_PATH, SCHEMA_VERSION, validateSnapshot } from './validate';
 
 /**
  * Builds the dashboard data snapshot: approved requirements, test cases and canonical tests,
@@ -21,7 +19,6 @@ import { readSpecSources, SnapshotError } from './spec-source';
  */
 
 export const DEFAULT_APP = 'requestflow';
-export const SCHEMA_PATH = join(__dirname, 'snapshot.schema.json');
 
 export interface BuildOptions {
   readonly app?: string;
@@ -88,7 +85,7 @@ export function buildSnapshot(repoRoot: string, options: BuildOptions = {}): unk
   const linked = testCases.filter((tc) => tc.automationLinkage.status === 'linked');
 
   const snapshot = {
-    schemaVersion: '1.0',
+    schemaVersion: SCHEMA_VERSION,
     app,
     source: {
       commit: git.head(),
@@ -115,8 +112,28 @@ export function buildSnapshot(repoRoot: string, options: BuildOptions = {}): unk
       title: can.title,
       level: can.level,
       covers: can.covers,
+      heading: can.heading,
+      markdown: can.markdown,
       automationLinkage: linkage((instance) => instance.tags.canonicals, can.id),
     })),
+    testPlan: {
+      title: sources.testPlan.title,
+      metadata: sources.testPlan.metadata.map((row) => ({ item: row.item, value: row.value })),
+      preamble: sources.testPlan.preamble,
+      sections: sources.testPlan.sections.map((section) =>
+        section.kind === 'inventory'
+          ? {
+              kind: section.kind,
+              heading: section.heading,
+              markdown: section.markdown,
+              requirementNotes: section.requirementNotes.map((note) => ({
+                requirementId: note.requirementId,
+                markdown: note.markdown,
+              })),
+            }
+          : { kind: section.kind, heading: section.heading, markdown: section.markdown },
+      ),
+    },
     testInstances: inventory.instances.map((instance) => ({
       id: instance.id,
       file: instance.file,
@@ -189,20 +206,6 @@ export function buildSnapshot(repoRoot: string, options: BuildOptions = {}): unk
     throw new SnapshotError(unsafe.map((finding) => `not public-safe: ${finding}`));
   }
   return snapshot;
-}
-
-let validator: ReturnType<Ajv2020['compile']> | undefined;
-
-/** Schema errors as "<instance path> <message>"; empty means valid. */
-export function validateSnapshot(value: unknown): string[] {
-  if (validator === undefined) {
-    const ajv = new Ajv2020({ allErrors: true, strict: true, strictRequired: false });
-    validator = ajv.compile(JSON.parse(readFileSync(SCHEMA_PATH, 'utf8')) as object);
-  }
-  if (validator(value)) return [];
-  return (validator.errors ?? []).map(
-    (error: ErrorObject) => `schema: ${error.instancePath || '/'} ${error.message ?? 'is invalid'}`,
-  );
 }
 
 export function serializeSnapshot(snapshot: unknown): string {

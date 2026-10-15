@@ -7,6 +7,7 @@ import {
   parseRequirements,
   parseTestPlan,
 } from '../../agents/orchestrator/validation/approved-ids';
+import { type PlanMetadataRow, type PlanSection, readPlanContent } from './plan-content';
 
 /**
  * The approved behavioural documents, read as the single source of truth. Which IDs exist is
@@ -55,6 +56,16 @@ export interface CanonicalRecord {
   readonly level: string;
   /** The Covers cell, verbatim. */
   readonly covers: string;
+  /** The canonical's `### CAN-NNN — …` subsection heading and body, verbatim. */
+  readonly heading: string;
+  readonly markdown: string;
+}
+
+export interface TestPlanContent {
+  readonly title: string;
+  readonly metadata: readonly PlanMetadataRow[];
+  readonly preamble: string;
+  readonly sections: readonly PlanSection[];
 }
 
 export interface SpecSources {
@@ -63,6 +74,7 @@ export interface SpecSources {
   readonly requirements: readonly RequirementRecord[];
   readonly testCases: readonly TestCaseRecord[];
   readonly canonicals: readonly CanonicalRecord[];
+  readonly testPlan: TestPlanContent;
 }
 
 export class SnapshotError extends Error {
@@ -102,7 +114,29 @@ export function readSpecSources(repoRoot: string, app: string): SpecSources {
 
   const requirements = readRequirements(requirementsText, requirementsPath, problems);
   const testCases = readTestCases(testPlanText, testPlanPath, problems);
-  const canonicals = readCanonicals(testPlanText, testPlanPath, problems);
+  const canonicalRows = readCanonicals(testPlanText, testPlanPath, problems);
+  const plan = readPlanContent(testPlanText, testPlanPath, problems);
+  const canonicals: CanonicalRecord[] = canonicalRows.map((row) => {
+    const section = plan.canonicalSections.get(row.id);
+    if (section === undefined)
+      problems.push(`${testPlanPath}: ${row.id} has no "### ${row.id} — …" subsection`);
+    return { ...row, heading: section?.heading ?? '', markdown: section?.markdown ?? '' };
+  });
+  for (const section of plan.sections) {
+    if (section.kind !== 'inventory') continue;
+    for (const note of section.requirementNotes) {
+      if (!approvedRequirements.ids.includes(note.requirementId)) {
+        problems.push(
+          `${testPlanPath}: inventory subsection ${note.requirementId} is not an approved requirement`,
+        );
+      }
+    }
+  }
+  for (const id of plan.canonicalSections.keys()) {
+    if (!canonicalRows.some((row) => row.id === id)) {
+      problems.push(`${testPlanPath}: subsection ${id} has no row in the canonical table`);
+    }
+  }
 
   // Cross-check: exactly the IDs the contract approves, with the same owners.
   sameIds(
@@ -142,6 +176,12 @@ export function readSpecSources(repoRoot: string, app: string): SpecSources {
 
   return {
     app,
+    testPlan: {
+      title: documents[1]?.title ?? '',
+      metadata: plan.metadata,
+      preamble: plan.preamble,
+      sections: plan.sections,
+    },
     documents,
     requirements: [...requirements].sort(byId),
     testCases: [...testCases].sort(byId),
@@ -203,8 +243,12 @@ function readTestCases(markdown: string, path: string, problems: string[]): Test
   return records;
 }
 
-function readCanonicals(markdown: string, path: string, problems: string[]): CanonicalRecord[] {
-  const records: CanonicalRecord[] = [];
+function readCanonicals(
+  markdown: string,
+  path: string,
+  problems: string[],
+): Omit<CanonicalRecord, 'heading' | 'markdown'>[] {
+  const records: Omit<CanonicalRecord, 'heading' | 'markdown'>[] = [];
   for (const { at, cells, header } of tableRows(markdown)) {
     if (!/^CAN-\d{3}$/.test(cells[0] ?? '')) continue;
     const row = byColumn(header, cells, CANONICAL_COLUMNS, `${path} ${at}`, problems);

@@ -32,7 +32,21 @@ Users delete things.
 
 const TEST_PLAN = `# Demo — Test Plan v1
 
+| Item  | Value             |
+| ----- | ----------------- |
+| Scope | REQ-001 – REQ-002 |
+
+This plan is a fixture.
+
+---
+
+## 1. Strategy
+
+Test through the API.
+
 ## 2. Test inventory
+
+Test case IDs use the form \`TC-NNN-NN\`.
 
 ### REQ-001 — Create a thing
 
@@ -40,6 +54,8 @@ const TEST_PLAN = `# Demo — Test Plan v1
 | --------- | ------------------------ | ----- | -------- | ---------- | -------- |
 | TC-001-01 | Create a thing → \`201\` | API   | Positive | Yes        | P0       |
 | TC-001-02 | Create a thing in the UI | UI    | Positive | No         | P1       |
+
+A note about REQ-001.
 
 ### REQ-002 — Delete a thing
 
@@ -49,9 +65,15 @@ const TEST_PLAN = `# Demo — Test Plan v1
 
 ## 3. Canonical automation candidates
 
+These are reference tests.
+
 | ID      | Title  | Level | Covers    |
 | ------- | ------ | ----- | --------- |
 | CAN-001 | Create | API   | TC-001-01 |
+
+### CAN-001 — Create (API)
+
+**Purpose:** reference creation.
 `;
 
 const roots: string[] = [];
@@ -400,6 +422,81 @@ describe('dashboard data: specification contract failures fail closed', () => {
       /requirements\.md is not tracked by git/,
     );
   });
+});
+
+describe('dashboard data: test plan content (schema 1.1)', () => {
+  test('plan prose is copied verbatim; structured tables are not repeated', () => {
+    const snapshot = build(fixtureRepo()) as {
+      schemaVersion: string;
+      testPlan: unknown;
+      canonicals: { id: string; heading: string; markdown: string }[];
+    };
+    assert.equal(snapshot.schemaVersion, '1.1');
+    assert.deepEqual(snapshot.testPlan, {
+      title: 'Demo — Test Plan v1',
+      metadata: [{ item: 'Scope', value: 'REQ-001 – REQ-002' }],
+      preamble: 'This plan is a fixture.',
+      sections: [
+        { kind: 'text', heading: '1. Strategy', markdown: 'Test through the API.' },
+        {
+          kind: 'inventory',
+          heading: '2. Test inventory',
+          markdown: 'Test case IDs use the form `TC-NNN-NN`.',
+          requirementNotes: [{ requirementId: 'REQ-001', markdown: 'A note about REQ-001.' }],
+        },
+        {
+          kind: 'canonicals',
+          heading: '3. Canonical automation candidates',
+          markdown: 'These are reference tests.',
+        },
+      ],
+    });
+    assert.deepEqual(
+      snapshot.canonicals.map((can) => [can.id, can.heading, can.markdown]),
+      [['CAN-001', 'CAN-001 — Create (API)', '**Purpose:** reference creation.']],
+    );
+  });
+
+  const failures: [string, string, RegExp][] = [
+    [
+      'a canonical without its subsection',
+      TEST_PLAN.replace('### CAN-001 — Create (API)\n\n**Purpose:** reference creation.\n', ''),
+      /CAN-001 has no "### CAN-001 — …" subsection/,
+    ],
+    [
+      'a canonical subsection without a table row',
+      `${TEST_PLAN}\n### CAN-009 — Orphan (API)\n\nText.\n`,
+      /subsection CAN-009 has no row in the canonical table/,
+    ],
+    [
+      'a non-requirement subsection in the inventory',
+      TEST_PLAN.replace('A note about REQ-001.', 'A note.\n\n### Notes\n\nMore.'),
+      /"### Notes" in "2\. Test inventory" is not a requirement subsection/,
+    ],
+    [
+      'a malformed metadata table',
+      TEST_PLAN.replace('| Item  | Value             |', '| Key   | Value             |'),
+      /metadata table must have the columns "Item \| Value"/,
+    ],
+    [
+      'an empty text section',
+      TEST_PLAN.replace('Test through the API.', ''),
+      /section "1\. Strategy" is empty/,
+    ],
+    [
+      'a second inventory section',
+      `${TEST_PLAN}\n## 9. More\n\n### REQ-002 — Delete a thing\n\nExtra.\n`,
+      /expected exactly one test inventory section, found 2/,
+    ],
+  ];
+  for (const [name, plan, expected] of failures) {
+    test(`${name} fails the build`, () => {
+      assert.match(
+        problemsOf(() => build(fixtureRepo(REQUIREMENTS, plan))),
+        expected,
+      );
+    });
+  }
 });
 
 // ---------------------------------------------------------------- inventory
@@ -786,6 +883,14 @@ describe('dashboard data: schema', () => {
     ],
     ['an extra field on a test instance', '/testInstances/0/stdout', 'x', /testInstances\/0/],
     ['a short commit SHA', '/source/commit', 'abc123', /source\/commit/],
+    ['the previous schema version', '/schemaVersion', '1.0', /schemaVersion/],
+    ['an unknown plan section kind', '/testPlan/sections/0/kind', 'html', /testPlan\/sections\/0/],
+    [
+      'a canonical without its Purpose/Flow',
+      '/canonicals/0/markdown',
+      '',
+      /canonicals\/0\/markdown/,
+    ],
   ];
   for (const [name, pointer, value, expected] of mutations) {
     test(`rejects ${name}`, () => {

@@ -31,5 +31,5 @@
     "integrations/**/*.ts",
     "reporting/**/*.ts"
   ],
-  "exclude": ["node_modules", "artifacts"]
+  "exclude": ["node_modules", "artifacts", "reporting/dashboard"]
 }
