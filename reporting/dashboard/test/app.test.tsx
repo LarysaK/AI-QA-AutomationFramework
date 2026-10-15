@@ -56,6 +56,39 @@ describe('Overview', () => {
   });
 });
 
+describe('Meters', () => {
+  test('each bar is announced once: named by its label, valued by its text', () => {
+    renderAt('#/');
+    const rows = [...document.querySelectorAll('.meter-row')].filter((row) =>
+      row.querySelector('meter'),
+    );
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      const meter = row.querySelector('meter');
+      const label = row.querySelector('.meter-label');
+      const text = row.querySelector('.meter-text');
+      expect(meter?.getAttribute('aria-labelledby')).toBe(label?.id);
+      expect(label?.textContent).not.toBe('');
+      expect(meter?.getAttribute('aria-valuetext')).toBe(text?.textContent);
+      expect(meter?.textContent, 'no duplicate fallback text').toBe('');
+      expect(text?.getAttribute('aria-hidden')).toBe('true');
+    }
+    const funnel = rows.find(
+      (row) => row.querySelector('.meter-label')?.textContent === 'Linked automation',
+    );
+    expect(funnel?.querySelector('meter')?.getAttribute('aria-valuetext')).toBe(
+      `${String(summary.linkedTestCasesWithIntentYes)} of ${String(summary.testCasesByAutomationIntent.Yes)} intended`,
+    );
+  });
+
+  test('the decorative bars in the requirement table are hidden; their label is the text', () => {
+    renderAt('#/');
+    const table = screen.getByRole('region', { name: 'Linkage by requirement' });
+    for (const meter of table.querySelectorAll('meter'))
+      expect(meter.getAttribute('aria-hidden')).toBe('true');
+  });
+});
+
 describe('Test Case Explorer', () => {
   test('lists all approved test cases', () => {
     renderAt('#/test-cases');
@@ -277,6 +310,60 @@ describe('Navigation and placeholders', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Skip to content' }));
     expect(window.location.hash).toBe('#/test-plan');
     expect(document.activeElement?.id).toBe('main');
+  });
+
+  test('Escape closes the mobile menu and returns focus to the menu button', () => {
+    renderAt('#/');
+    const button = screen.getByRole('button', { name: 'Menu' });
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(document.activeElement).not.toBe(button);
+    fireEvent.click(button);
+    expect(button.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(document.getElementById('primary-navigation')?.className).not.toContain('sidebar-open');
+    expect(document.activeElement).toBe(button);
+  });
+
+  test('background content is inert while the mobile menu is open, and only then', () => {
+    renderAt('#/');
+    const main = document.getElementById('main');
+    const brand = screen.getByRole('link', { name: /RequestFlow QA Dashboard/ });
+    const skip = screen.getByText('Skip to content');
+    const nav = document.getElementById('primary-navigation');
+    const button = screen.getByRole('button', { name: 'Menu' });
+    for (const element of [main, brand, skip]) expect(element?.hasAttribute('inert')).toBe(false);
+    fireEvent.click(button);
+    for (const element of [main, brand, skip]) expect(element?.hasAttribute('inert')).toBe(true);
+    expect(nav?.hasAttribute('inert')).toBe(false);
+    expect(button.closest('[inert]')).toBeNull();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    for (const element of [main, brand, skip]) expect(element?.hasAttribute('inert')).toBe(false);
+  });
+
+  test('choosing a page from the mobile menu closes it and moves focus to the new page', () => {
+    renderAt('#/');
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    const link = within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('link', {
+      name: 'Test Plan',
+    });
+    fireEvent.click(link);
+    go('#/test-plan');
+    expect(document.getElementById('main')?.hasAttribute('inert')).toBe(false);
+    expect(document.activeElement).toBe(
+      screen.getByRole('heading', { level: 1, name: snapshot.testPlan.title }),
+    );
+  });
+
+  test('choosing the current page from the mobile menu moves focus to its heading', () => {
+    renderAt('#/test-plan');
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    const nav = within(screen.getByRole('navigation', { name: 'Primary' }));
+    fireEvent.click(nav.getByRole('link', { name: 'Test Plan' }));
+    expect(screen.getByRole('button', { name: 'Menu' }).getAttribute('aria-expanded')).toBe(
+      'false',
+    );
+    expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1 }));
   });
 
   test('unknown routes show a not-found page', () => {

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { type ReactNode, useId } from 'react';
 
 export function PageHeader({
   eyebrow,
@@ -58,7 +58,11 @@ export function Stat({
   );
 }
 
-/** A labelled horizontal bar; a native <meter>, so no inline styles are needed. */
+/**
+ * A labelled horizontal bar. The <meter> carries the accessible name (the label) and value (the
+ * text); the visible text is hidden from assistive technology so the value is announced once.
+ * A native <meter>, so no inline styles are needed.
+ */
 export function MeterRow({
   label,
   value,
@@ -72,13 +76,23 @@ export function MeterRow({
   text: string;
   tone?: 'accent' | 'neutral';
 }) {
+  const labelId = useId();
   return (
     <div className="meter-row">
-      <span className="meter-label">{label}</span>
-      <meter className={`meter meter-${tone}`} min={0} max={Math.max(max, 1)} value={value}>
+      <span className="meter-label" id={labelId}>
+        {label}
+      </span>
+      <meter
+        className={`meter meter-${tone}`}
+        min={0}
+        max={Math.max(max, 1)}
+        value={value}
+        aria-labelledby={labelId}
+        aria-valuetext={text}
+      />
+      <span className="meter-text" aria-hidden="true">
         {text}
-      </meter>
-      <span className="meter-text">{text}</span>
+      </span>
     </div>
   );
 }
