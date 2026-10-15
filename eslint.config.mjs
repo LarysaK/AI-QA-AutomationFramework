@@ -48,9 +48,9 @@ export default tseslint.config(
   },
 
   {
-    // Agent-layer unit tests use the built-in Node test runner, whose test() and describe()
-    // return promises the runner itself tracks.
-    files: ['agents/**/*.test.ts'],
+    // Agent-layer and reporting unit tests use the built-in Node test runner, whose test() and
+    // describe() return promises the runner itself tracks.
+    files: ['agents/**/*.test.ts', 'reporting/**/*.test.ts'],
     rules: {
       '@typescript-eslint/no-floating-promises': [
         'error',
