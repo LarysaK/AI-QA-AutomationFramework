@@ -1,0 +1,1255 @@
+{
+  "config": {
+    "argv": [
+      "/home/runner/.nvm/versions/node/v22.23.3/bin/node",
+      "/home/runner/work/AI-QA-AutomationFramework/AI-QA-AutomationFramework/node_modules/.bin/playwright",
+      "test"
+    ],
+    "configFile": "/home/runner/work/AI-QA-AutomationFramework/AI-QA-AutomationFramework/playwright.config.ts",
+    "rootDir": "/home/runner/work/AI-QA-AutomationFramework/AI-QA-AutomationFramework/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": "/home/runner/work/AI-QA-AutomationFramework/AI-QA-AutomationFramework/apps/requestflow/global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 5
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/home/runner/work/AI-QA-AutomationFramework/AI-QA-AutomationFramework/artifacts/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 5
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/home/runner/work/AI-QA-AutomationFramework/AI-QA-AutomationFramework/tests",
+        "testIgnore": [],
+        "testMatch": ["**/*.@(spec|test).?(c|m)[jt]s?(x)"],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      ["list", null],
+      [
+        "html",
+        {
+          "outputFolder": "./artifacts/playwright-report",
+          "open": "never"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "./artifacts/results/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.63.0",
+    "workers": 5,
+    "webServer": {
+      "command": "npm run aut:start",
+      "url": "http://127.0.0.1:3100/health",
+      "reuseExistingServer": true,
+      "env": {
+        "HOST": "127.0.0.1",
+        "PORT": "3100",
+        "REQUESTFLOW_TEST_HOOKS": "1"
+      }
+    }
+  },
+  "suites": [
+    {
+      "title": "requestflow/api/create-request-validation.spec.ts",
+      "file": "requestflow/api/create-request-validation.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "REQ-001 Create a request: validation boundaries (API)",
+          "file": "requestflow/api/create-request-validation.spec.ts",
+          "line": 108,
+          "column": 6,
+          "specs": [
+            {
+              "title": "accepts title of 1 character",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-04"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 25,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.332Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-f62c47037ea17fba3b15",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 113,
+              "column": 11
+            },
+            {
+              "title": "accepts title of 100 characters",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-04"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 22,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.344Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-a6b88d437de6c3072e37",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 113,
+              "column": 11
+            },
+            {
+              "title": "accepts description of 1 character",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-07"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 18,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.338Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-d486fd8111a13da2db4a",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 113,
+              "column": 11
+            },
+            {
+              "title": "accepts description of 1000 characters",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-07"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 20,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.351Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-4341e019a3ce5e8955a1",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 113,
+              "column": 11
+            },
+            {
+              "title": "accepts amount 0.01 (minimum)",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-09"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
+                      "status": "passed",
+                      "duration": 23,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.343Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-0e36bec6bd261e50f34e",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 113,
+              "column": 11
+            },
+            {
+              "title": "accepts amount 100000 (maximum)",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-09"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 8,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.374Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-ec36eb666b349ae3c95c",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 113,
+              "column": 11
+            },
+            {
+              "title": "accepts amount 10.12 (2 decimal places)",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-09"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 12,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.375Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-c39bc49b4b1bce49f0ea",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 113,
+              "column": 11
+            },
+            {
+              "title": "stores trimmed values for title and description surrounded by whitespace",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-02"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 14,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.382Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-9e6e5e39f4f9bd4817de",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 134,
+              "column": 11
+            },
+            {
+              "title": "stores trimmed values for title of 100 characters surrounded by whitespace",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-04"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
+                      "status": "passed",
+                      "duration": 13,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.386Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-50018e4efa6bf594d35d",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 134,
+              "column": 11
+            },
+            {
+              "title": "rejects empty title",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-03"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 8,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.389Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-2af64a9e4742cb0070cf",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 158,
+              "column": 11
+            },
+            {
+              "title": "rejects whitespace-only title",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-03"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 8,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.390Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-0029740d66f14f48a6bf",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 158,
+              "column": 11
+            },
+            {
+              "title": "rejects title of 101 characters",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-05"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 10,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.393Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-bd237da79beb63ec7e63",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 158,
+              "column": 11
+            },
+            {
+              "title": "rejects empty description",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-06"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 9,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.401Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-bbb63565d826abc0b399",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 158,
+              "column": 11
+            },
+            {
+              "title": "rejects whitespace-only description",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-06"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 8,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.401Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-53c592e8ecb8600ca7b3",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 158,
+              "column": 11
+            },
+            {
+              "title": "rejects description of 1001 characters",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-08"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
+                      "status": "passed",
+                      "duration": 10,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.403Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-ded6cff1eccdc326a426",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 158,
+              "column": 11
+            },
+            {
+              "title": "rejects amount 0",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-10"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 9,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.405Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-7e7bca9699870643cf14",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 158,
+              "column": 11
+            },
+            {
+              "title": "rejects negative amount",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-10"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 8,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.408Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-28e84d34aa59dd14a6d2",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 158,
+              "column": 11
+            },
+            {
+              "title": "rejects amount 100000.01",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-10"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 9,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.416Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-55879742c377c405bc84",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 158,
+              "column": 11
+            },
+            {
+              "title": "rejects amount with 3 decimal places",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-10"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 8,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.415Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-cb88917b902dd5ef9609",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 158,
+              "column": 11
+            },
+            {
+              "title": "rejects numeric amount sent as a string",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-11"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
+                      "status": "passed",
+                      "duration": 8,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.416Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-985b945458062a36a736",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 158,
+              "column": 11
+            },
+            {
+              "title": "rejects non-numeric amount",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-11"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 8,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.420Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-9b0ed3d196e2789e2cf9",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 158,
+              "column": 11
+            },
+            {
+              "title": "rejects missing title",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-12"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 12,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.420Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-304cb5c111d0e8b08791",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 158,
+              "column": 11
+            },
+            {
+              "title": "rejects missing description",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-12"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 7,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.432Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-a2ff678d294fe5059bf4",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 158,
+              "column": 11
+            },
+            {
+              "title": "rejects missing amount",
+              "ok": true,
+              "tags": ["REQ-001", "CAN-002", "TC-001-12"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
+                      "status": "passed",
+                      "duration": 10,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.429Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "1061e5c39dd1405d2468-081a80f537ce0cd7bad3",
+              "file": "requestflow/api/create-request-validation.spec.ts",
+              "line": 158,
+              "column": 11
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "requestflow/api/edit-draft-request.spec.ts",
+      "file": "requestflow/api/edit-draft-request.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "REQ-002 Edit a draft request (API)",
+          "file": "requestflow/api/edit-draft-request.spec.ts",
+          "line": 31,
+          "column": 6,
+          "specs": [
+            {
+              "title": "Employee changes only the title of own DRAFT; all other fields are preserved",
+              "ok": true,
+              "tags": ["REQ-002", "CAN-003", "TC-002-02"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 13,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.431Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "087c0c5daaf3eaace47a-22d711a040c319d80aff",
+              "file": "requestflow/api/edit-draft-request.spec.ts",
+              "line": 32,
+              "column": 7
+            },
+            {
+              "title": "Edit with one valid and one invalid field is rejected and changes nothing",
+              "ok": true,
+              "tags": ["REQ-002", "CAN-003", "TC-002-04"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "passed",
+                      "duration": 11,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.433Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "087c0c5daaf3eaace47a-a6eacbb62fbd50bea1fe",
+              "file": "requestflow/api/edit-draft-request.spec.ts",
+              "line": 60,
+              "column": 7
+            },
+            {
+              "title": "Edit of a SUBMITTED request is rejected as an invalid state transition",
+              "ok": true,
+              "tags": ["REQ-002", "CAN-003", "TC-002-10"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "passed",
+                      "duration": 17,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.440Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "087c0c5daaf3eaace47a-695ceee24d333d8f1b27",
+              "file": "requestflow/api/edit-draft-request.spec.ts",
+              "line": 83,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "requestflow/e2e/approve-request.spec.ts",
+      "file": "requestflow/e2e/approve-request.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Request approval workflow (E2E)",
+          "file": "requestflow/e2e/approve-request.spec.ts",
+          "line": 16,
+          "column": 6,
+          "specs": [
+            {
+              "title": "Employee submits a request, Reviewer approves it, and both UI and API show APPROVED",
+              "ok": true,
+              "tags": [
+                "REQ-003",
+                "REQ-004",
+                "REQ-005",
+                "REQ-008",
+                "TC-003-08",
+                "TC-004-08",
+                "TC-005-08",
+                "TC-008-08",
+                "CAN-004"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 4,
+                      "status": "passed",
+                      "duration": 788,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Alex creates a request and submits it for review",
+                          "duration": 329
+                        },
+                        {
+                          "title": "Jordan finds the request in the Review queue and approves it",
+                          "duration": 229
+                        },
+                        {
+                          "title": "Alex sees the request as APPROVED in the same session",
+                          "duration": 15
+                        },
+                        {
+                          "title": "The API confirms the persisted final state",
+                          "duration": 3
+                        }
+                      ],
+                      "startTime": "2026-10-18T20:04:54.448Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0e5cd8cf2b0905c1f51a-951d48748bcdfde8685b",
+              "file": "requestflow/e2e/approve-request.spec.ts",
+              "line": 17,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "requestflow/e2e/reject-request.spec.ts",
+      "file": "requestflow/e2e/reject-request.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Request rejection workflow (E2E)",
+          "file": "requestflow/e2e/reject-request.spec.ts",
+          "line": 16,
+          "column": 6,
+          "specs": [
+            {
+              "title": "Reviewer must give a comment to reject; the rejected request and its comment reach the Employee and the API",
+              "ok": true,
+              "tags": [
+                "REQ-003",
+                "REQ-006",
+                "REQ-008",
+                "TC-006-11",
+                "TC-006-12",
+                "TC-008-08",
+                "CAN-005"
+              ],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "passed",
+                      "duration": 897,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "steps": [
+                        {
+                          "title": "Alex creates a request and submits it for review",
+                          "duration": 327
+                        },
+                        {
+                          "title": "Jordan opens the request from the Review queue",
+                          "duration": 161
+                        },
+                        {
+                          "title": "A whitespace-only rejection comment is refused by the server",
+                          "duration": 81
+                        },
+                        {
+                          "title": "Jordan rejects the request with a comment",
+                          "duration": 66
+                        },
+                        {
+                          "title": "Alex sees the rejection and its comment in the same session",
+                          "duration": 19
+                        },
+                        {
+                          "title": "The API confirms the persisted final state",
+                          "duration": 3
+                        }
+                      ],
+                      "startTime": "2026-10-18T20:04:54.448Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "41cbdbb58a8f35bcb11b-3d0e63f8994afaf3507e",
+              "file": "requestflow/e2e/reject-request.spec.ts",
+              "line": 17,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "requestflow/ui/create-request.spec.ts",
+      "file": "requestflow/ui/create-request.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "REQ-001 Create a request",
+          "file": "requestflow/ui/create-request.spec.ts",
+          "line": 9,
+          "column": 6,
+          "specs": [
+            {
+              "title": "Employee creates a valid request and sees it as a DRAFT",
+              "ok": true,
+              "tags": ["REQ-001", "TC-001-17", "CAN-001"],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 473,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-10-18T20:04:54.450Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "ecbdf010184b3bc3f097-7c494ef8bacad9964b74",
+              "file": "requestflow/ui/create-request.spec.ts",
+              "line": 10,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-18T20:04:53.692Z",
+    "duration": 1829.158,
+    "expected": 30,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

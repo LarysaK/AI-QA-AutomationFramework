@@ -1,0 +1,3 @@
+import { test } from '@playwright/test';
+throw new Error('import-time failure in a test file');
+test('never registered', () => {});

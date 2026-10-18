@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import { describe, test } from 'node:test';
+
+describe('outer suite', () => {
+  test('passes', () => {});
+  test('fails', () => {
+    assert.equal(1, 2);
+  });
+  describe('inner suite', () => {
+    test('nested pass', () => {});
+    test('skipped', { skip: 'not applicable' }, () => {});
+    test('todo', { todo: 'later' }, () => {});
+  });
+});
+
+test('prints text that looks like a TAP summary', () => {
+  console.log('# tests 999');
+  console.log('# pass 999');
+});
+
+test('parent that times out', { timeout: 50 }, async (t) => {
+  await t.test('child that never finishes', async () => {
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+  });
+});

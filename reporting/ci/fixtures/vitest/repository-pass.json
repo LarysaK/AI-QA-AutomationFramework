@@ -1,0 +1,496 @@
+{
+  "numTotalTestSuites": 14,
+  "numPassedTestSuites": 14,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 39,
+  "numPassedTests": 39,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1792353897252,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Overview"],
+          "fullName": "Overview shows the real counts, linked coverage of intended test cases and no CI results",
+          "status": "passed",
+          "title": "shows the real counts, linked coverage of intended test cases and no CI results",
+          "duration": 66.15550000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Overview"],
+          "fullName": "Overview every requirement shows \"n of m test cases linked\", never a bare linked/unlinked label",
+          "status": "passed",
+          "title": "every requirement shows \"n of m test cases linked\", never a bare linked/unlinked label",
+          "duration": 15.67841599999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Meters"],
+          "fullName": "Meters each bar is announced once: named by its label, valued by its text",
+          "status": "passed",
+          "title": "each bar is announced once: named by its label, valued by its text",
+          "duration": 7.78733299999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Meters"],
+          "fullName": "Meters the decorative bars in the requirement table are hidden; their label is the text",
+          "status": "passed",
+          "title": "the decorative bars in the requirement table are hidden; their label is the text",
+          "duration": 7.600332999999978,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Test Case Explorer"],
+          "fullName": "Test Case Explorer lists all approved test cases",
+          "status": "passed",
+          "title": "lists all approved test cases",
+          "duration": 82.18016599999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Test Case Explorer"],
+          "fullName": "Test Case Explorer searches by ID and by scenario text",
+          "status": "passed",
+          "title": "searches by ID and by scenario text",
+          "duration": 68.62908300000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Test Case Explorer"],
+          "fullName": "Test Case Explorer filters by requirement, level, priority, intent and linkage, and clears",
+          "status": "passed",
+          "title": "filters by requirement, level, priority, intent and linkage, and clears",
+          "duration": 227.48754199999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Test Case Explorer"],
+          "fullName": "Test Case Explorer filters are kept in the URL",
+          "status": "passed",
+          "title": "filters are kept in the URL",
+          "duration": 7.620458000000099,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Test case details"],
+          "fullName": "Test case details every approved test case has a detail page with its exact scenario",
+          "status": "passed",
+          "title": "every approved test case has a detail page with its exact scenario",
+          "duration": 406.5944999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Test case details"],
+          "fullName": "Test case details a linked test case lists its committed instances, the linkage caveat and no execution result",
+          "status": "passed",
+          "title": "a linked test case lists its committed instances, the linkage caveat and no execution result",
+          "duration": 4.282375000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Test case details"],
+          "fullName": "Test case details an unknown test case is reported, not invented",
+          "status": "passed",
+          "title": "an unknown test case is reported, not invented",
+          "duration": 1.763582999999926,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Automation intent: No"],
+          "fullName": "Automation intent: No each such test case links to the plan sections that name it, and nothing else",
+          "status": "passed",
+          "title": "each such test case links to the plan sections that name it, and nothing else",
+          "duration": 8.24566700000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Automation intent: No"],
+          "fullName": "Automation intent: No the plan link opens the named section, not the top of the plan",
+          "status": "passed",
+          "title": "the plan link opens the named section, not the top of the plan",
+          "duration": 21.111667000000125,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Automation intent: No"],
+          "fullName": "Automation intent: No no page claims the status is by design, on purpose or permanent",
+          "status": "passed",
+          "title": "no page claims the status is by design, on purpose or permanent",
+          "duration": 52.03687500000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Test Plan"],
+          "fullName": "Test Plan renders the plan metadata, every section and every canonical Purpose/Flow from the snapshot",
+          "status": "passed",
+          "title": "renders the plan metadata, every section and every canonical Purpose/Flow from the snapshot",
+          "duration": 56.235124999999925,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Navigation and placeholders"],
+          "fullName": "Navigation and placeholders placeholders say the integration is not connected",
+          "status": "passed",
+          "title": "placeholders say the integration is not connected",
+          "duration": 6.136124999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Navigation and placeholders"],
+          "fullName": "Navigation and placeholders the active page is marked, unavailable pages are tagged, and focus moves to the new page",
+          "status": "passed",
+          "title": "the active page is marked, unavailable pages are tagged, and focus moves to the new page",
+          "duration": 26.169875000000047,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Navigation and placeholders"],
+          "fullName": "Navigation and placeholders the mobile menu button controls the navigation",
+          "status": "passed",
+          "title": "the mobile menu button controls the navigation",
+          "duration": 7.417332999999871,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Navigation and placeholders"],
+          "fullName": "Navigation and placeholders the skip link moves focus to the content without changing the route",
+          "status": "passed",
+          "title": "the skip link moves focus to the content without changing the route",
+          "duration": 23.33549999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Navigation and placeholders"],
+          "fullName": "Navigation and placeholders Escape closes the mobile menu and returns focus to the menu button",
+          "status": "passed",
+          "title": "Escape closes the mobile menu and returns focus to the menu button",
+          "duration": 4.182250000000067,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Navigation and placeholders"],
+          "fullName": "Navigation and placeholders background content is inert while the mobile menu is open, and only then",
+          "status": "passed",
+          "title": "background content is inert while the mobile menu is open, and only then",
+          "duration": 10.185249999999996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Navigation and placeholders"],
+          "fullName": "Navigation and placeholders choosing a page from the mobile menu closes it and moves focus to the new page",
+          "status": "passed",
+          "title": "choosing a page from the mobile menu closes it and moves focus to the new page",
+          "duration": 22.94337500000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Navigation and placeholders"],
+          "fullName": "Navigation and placeholders choosing the current page from the mobile menu moves focus to its heading",
+          "status": "passed",
+          "title": "choosing the current page from the mobile menu moves focus to its heading",
+          "duration": 22.844792000000098,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Navigation and placeholders"],
+          "fullName": "Navigation and placeholders unknown routes show a not-found page",
+          "status": "passed",
+          "title": "unknown routes show a not-found page",
+          "duration": 1.6264589999998407,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        }
+      ],
+      "startTime": 1792353897885,
+      "endTime": 1792353899043.6265,
+      "status": "passed",
+      "message": "",
+      "name": "/home/runner/work/AI-QA-AutomationFramework/AI-QA-AutomationFramework/reporting/dashboard/test/app.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["derived views"],
+          "fullName": "derived views requirement linkage is always \"n of m test cases linked\" and adds up to the summary",
+          "status": "passed",
+          "title": "requirement linkage is always \"n of m test cases linked\" and adds up to the summary",
+          "duration": 1.5677500000000464,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["derived views"],
+          "fullName": "derived views filters round-trip through the URL; invalid values are ignored",
+          "status": "passed",
+          "title": "filters round-trip through the URL; invalid values are ignored",
+          "duration": 0.5697499999999991,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["derived views"],
+          "fullName": "derived views search matches the ID and the verbatim scenario, case-insensitively",
+          "status": "passed",
+          "title": "search matches the ID and the verbatim scenario, case-insensitively",
+          "duration": 0.34749999999996817,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        }
+      ],
+      "startTime": 1792353897826,
+      "endTime": 1792353897828.3474,
+      "status": "passed",
+      "message": "",
+      "name": "/home/runner/work/AI-QA-AutomationFramework/AI-QA-AutomationFramework/reporting/dashboard/test/derive.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Markdown is rendered as untrusted text"],
+          "fullName": "Markdown is rendered as untrusted text raw HTML is never rendered or executed",
+          "status": "passed",
+          "title": "raw HTML is never rendered or executed",
+          "duration": 16.53595800000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Markdown is rendered as untrusted text"],
+          "fullName": "Markdown is rendered as untrusted text images are never loaded; their alt text is shown",
+          "status": "passed",
+          "title": "images are never loaded; their alt text is shown",
+          "duration": 3.3063339999999926,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Markdown is rendered as untrusted text"],
+          "fullName": "Markdown is rendered as untrusted text only absolute https links become links, with no opener or referrer",
+          "status": "passed",
+          "title": "only absolute https links become links, with no opener or referrer",
+          "duration": 5.8331249999999955,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Markdown is rendered as untrusted text"],
+          "fullName": "Markdown is rendered as untrusted text tables from the plan are rendered (GitHub-flavoured Markdown)",
+          "status": "passed",
+          "title": "tables from the plan are rendered (GitHub-flavoured Markdown)",
+          "duration": 2.3935000000000173,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["Markdown is rendered as untrusted text"],
+          "fullName": "Markdown is rendered as untrusted text inline Markdown keeps formatting but no block elements",
+          "status": "passed",
+          "title": "inline Markdown keeps formatting but no block elements",
+          "duration": 2.5122499999999945,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        }
+      ],
+      "startTime": 1792353897870,
+      "endTime": 1792353897900.5122,
+      "status": "passed",
+      "message": "",
+      "name": "/home/runner/work/AI-QA-AutomationFramework/AI-QA-AutomationFramework/reporting/dashboard/test/markdown.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["snapshot plugin: production build safety gate"],
+          "fullName": "snapshot plugin: production build safety gate control: the real snapshot builds, and the bundle contains its data but no test secret",
+          "status": "passed",
+          "title": "control: the real snapshot builds, and the bundle contains its data but no test secret",
+          "duration": 163.72925,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["snapshot plugin: production build safety gate"],
+          "fullName": "snapshot plugin: production build safety gate a schema-valid snapshot with a credential in a requirement fails the build and nothing is emitted",
+          "status": "passed",
+          "title": "a schema-valid snapshot with a credential in a requirement fails the build and nothing is emitted",
+          "duration": 46.303417000000024,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["snapshot plugin: production build safety gate"],
+          "fullName": "snapshot plugin: production build safety gate a schema-valid snapshot with an absolute local path in a scenario fails the build and nothing is emitted",
+          "status": "passed",
+          "title": "a schema-valid snapshot with an absolute local path in a scenario fails the build and nothing is emitted",
+          "duration": 42.09599999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["snapshot plugin: production build safety gate"],
+          "fullName": "snapshot plugin: production build safety gate a schema-valid snapshot with the repository's absolute path in the plan preamble fails the build and nothing is emitted",
+          "status": "passed",
+          "title": "a schema-valid snapshot with the repository's absolute path in the plan preamble fails the build and nothing is emitted",
+          "duration": 51.324749999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["snapshot plugin: production build safety gate"],
+          "fullName": "snapshot plugin: production build safety gate a schema-valid snapshot with an e-mail address in a canonical's Purpose/Flow fails the build and nothing is emitted",
+          "status": "passed",
+          "title": "a schema-valid snapshot with an e-mail address in a canonical's Purpose/Flow fails the build and nothing is emitted",
+          "duration": 42.17679199999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["snapshot plugin: production build safety gate"],
+          "fullName": "snapshot plugin: production build safety gate a schema-invalid snapshot fails the build",
+          "status": "passed",
+          "title": "a schema-invalid snapshot fails the build",
+          "duration": 42.17208300000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        },
+        {
+          "ancestorTitles": ["snapshot plugin: production build safety gate"],
+          "fullName": "snapshot plugin: production build safety gate a missing snapshot fails the build",
+          "status": "passed",
+          "title": "a missing snapshot fails the build",
+          "duration": 40.87629199999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": [],
+          "benchmarks": []
+        }
+      ],
+      "startTime": 1792353897460,
+      "endTime": 1792353897888.8762,
+      "status": "passed",
+      "message": "",
+      "name": "/home/runner/work/AI-QA-AutomationFramework/AI-QA-AutomationFramework/reporting/dashboard/test-node/snapshot-plugin.test.ts"
+    }
+  ]
+}

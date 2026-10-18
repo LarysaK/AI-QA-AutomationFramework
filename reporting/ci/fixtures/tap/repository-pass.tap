@@ -1,0 +1,433 @@
+TAP version 13
+# Subtest: dashboard data: the approved RequestFlow documents and committed tests
+    # Subtest: matches the approved plan counts and the current committed tests
+    ok 1 - matches the approved plan counts and the current committed tests
+      ---
+      duration_ms: 379.255708
+      type: 'test'
+      ...
+    # Subtest: is schema-valid, public-safe and byte-identical when rebuilt
+    ok 2 - is schema-valid, public-safe and byte-identical when rebuilt
+      ---
+      duration_ms: 360.066375
+      type: 'test'
+      ...
+    # Subtest: records the exact source documents and commit
+    ok 3 - records the exact source documents and commit
+      ---
+      duration_ms: 20.674625
+      type: 'test'
+      ...
+    # Subtest: states that no CI runs exist and local results are not used
+    ok 4 - states that no CI runs exist and local results are not used
+      ---
+      duration_ms: 0.137166
+      type: 'test'
+      ...
+    1..4
+ok 1 - dashboard data: the approved RequestFlow documents and committed tests
+  ---
+  duration_ms: 760.469
+  type: 'suite'
+  ...
+# Subtest: dashboard data: fixture build
+    # Subtest: keeps intent, linkage and (absent) execution separate, and scenarios verbatim
+    ok 1 - keeps intent, linkage and (absent) execution separate, and scenarios verbatim
+      ---
+      duration_ms: 1.10225
+      type: 'test'
+      ...
+    # Subtest: is deterministic regardless of discovery order and tag order
+    ok 2 - is deterministic regardless of discovery order and tag order
+      ---
+      duration_ms: 1.138291
+      type: 'test'
+      ...
+    # Subtest: requirement sections are copied verbatim, without the trailing separator
+    ok 3 - requirement sections are copied verbatim, without the trailing separator
+      ---
+      duration_ms: 0.722292
+      type: 'test'
+      ...
+    # Subtest: gitBlobSha equals git hash-object
+    ok 4 - gitBlobSha equals git hash-object
+      ---
+      duration_ms: 0.15425
+      type: 'test'
+      ...
+    1..4
+ok 2 - dashboard data: fixture build
+  ---
+  duration_ms: 3.241833
+  type: 'suite'
+  ...
+# Subtest: dashboard data: specification contract failures fail closed
+    # Subtest: a TC row outside a REQ section
+    ok 1 - a TC row outside a REQ section
+      ---
+      duration_ms: 0.565958
+      type: 'test'
+      ...
+    # Subtest: unexpected table columns
+    ok 2 - unexpected table columns
+      ---
+      duration_ms: 0.53625
+      type: 'test'
+      ...
+    # Subtest: an invalid Level value
+    ok 3 - an invalid Level value
+      ---
+      duration_ms: 0.414292
+      type: 'test'
+      ...
+    # Subtest: an invalid Automation value
+    ok 4 - an invalid Automation value
+      ---
+      duration_ms: 0.4065
+      type: 'test'
+      ...
+    # Subtest: an empty scenario
+    ok 5 - an empty scenario
+      ---
+      duration_ms: 0.370834
+      type: 'test'
+      ...
+    # Subtest: a test case under a requirement that does not exist
+    ok 6 - a test case under a requirement that does not exist
+      ---
+      duration_ms: 0.363167
+      type: 'test'
+      ...
+    # Subtest: a malformed requirement heading
+    ok 7 - a malformed requirement heading
+      ---
+      duration_ms: 0.328292
+      type: 'test'
+      ...
+    # Subtest: a TC ID owned by another requirement
+    ok 8 - a TC ID owned by another requirement
+      ---
+      duration_ms: 0.302834
+      type: 'test'
+      ...
+    # Subtest: a missing test plan
+    ok 9 - a missing test plan
+      ---
+      duration_ms: 0.22825
+      type: 'test'
+      ...
+    # Subtest: uncommitted or untracked spec documents
+    ok 10 - uncommitted or untracked spec documents
+      ---
+      duration_ms: 0.400542
+      type: 'test'
+      ...
+    1..10
+ok 3 - dashboard data: specification contract failures fail closed
+  ---
+  duration_ms: 4.044458
+  type: 'suite'
+  ...
+# Subtest: dashboard data: test plan content (schema 1.1)
+    # Subtest: plan prose is copied verbatim; structured tables are not repeated
+    ok 1 - plan prose is copied verbatim; structured tables are not repeated
+      ---
+      duration_ms: 0.608166
+      type: 'test'
+      ...
+    # Subtest: a canonical without its subsection fails the build
+    ok 2 - a canonical without its subsection fails the build
+      ---
+      duration_ms: 0.384958
+      type: 'test'
+      ...
+    # Subtest: a canonical subsection without a table row fails the build
+    ok 3 - a canonical subsection without a table row fails the build
+      ---
+      duration_ms: 0.355375
+      type: 'test'
+      ...
+    # Subtest: a non-requirement subsection in the inventory fails the build
+    ok 4 - a non-requirement subsection in the inventory fails the build
+      ---
+      duration_ms: 0.382125
+      type: 'test'
+      ...
+    # Subtest: a malformed metadata table fails the build
+    ok 5 - a malformed metadata table fails the build
+      ---
+      duration_ms: 0.368917
+      type: 'test'
+      ...
+    # Subtest: an empty text section fails the build
+    ok 6 - an empty text section fails the build
+      ---
+      duration_ms: 0.348917
+      type: 'test'
+      ...
+    # Subtest: a second inventory section fails the build
+    ok 7 - a second inventory section fails the build
+      ---
+      duration_ms: 0.36225
+      type: 'test'
+      ...
+    1..7
+ok 4 - dashboard data: test plan content (schema 1.1)
+  ---
+  duration_ms: 2.863917
+  type: 'suite'
+  ...
+# Subtest: dashboard data: committed test inventory
+    # Subtest: an unknown TC tag fails the build
+    ok 1 - an unknown TC tag fails the build
+      ---
+      duration_ms: 0.604875
+      type: 'test'
+      ...
+    # Subtest: an unknown REQ tag fails the build
+    ok 2 - an unknown REQ tag fails the build
+      ---
+      duration_ms: 0.448333
+      type: 'test'
+      ...
+    # Subtest: an unknown CAN tag fails the build
+    ok 3 - an unknown CAN tag fails the build
+      ---
+      duration_ms: 0.834125
+      type: 'test'
+      ...
+    # Subtest: a malformed TC tag fails the build
+    ok 4 - a malformed TC tag fails the build
+      ---
+      duration_ms: 0.556666
+      type: 'test'
+      ...
+    # Subtest: a lower-case ID tag fails the build
+    ok 5 - a lower-case ID tag fails the build
+      ---
+      duration_ms: 0.42425
+      type: 'test'
+      ...
+    # Subtest: tags that are not traceability IDs are not copied
+    ok 6 - tags that are not traceability IDs are not copied
+      ---
+      duration_ms: 0.629167
+      type: 'test'
+      ...
+    # Subtest: uncommitted files under tests/ stop the build before anything is discovered
+    ok 7 - uncommitted files under tests/ stop the build before anything is discovered
+      ---
+      duration_ms: 0.470083
+      type: 'test'
+      ...
+    # Subtest: a discovered file that git does not track fails the build
+    ok 8 - a discovered file that git does not track fails the build
+      ---
+      duration_ms: 0.436209
+      type: 'test'
+      ...
+    # Subtest: discovery outside the repository tests/ directory fails the build
+    ok 9 - discovery outside the repository tests/ directory fails the build
+      ---
+      duration_ms: 0.766667
+      type: 'test'
+      ...
+    # Subtest: a spec outside tests/ or not a test file fails the build
+    ok 10 - a spec outside tests/ or not a test file fails the build
+      ---
+      duration_ms: 0.483083
+      type: 'test'
+      ...
+    # Subtest: a failed or broken listing fails without echoing its output
+    ok 11 - a failed or broken listing fails without echoing its output
+      ---
+      duration_ms: 1.016709
+      type: 'test'
+      ...
+    # Subtest: duplicate spec IDs fail the build
+    ok 12 - duplicate spec IDs fail the build
+      ---
+      duration_ms: 0.392834
+      type: 'test'
+      ...
+    1..12
+ok 5 - dashboard data: committed test inventory
+  ---
+  duration_ms: 7.172125
+  type: 'suite'
+  ...
+# Subtest: dashboard data: git probe
+    # Subtest: reports modified, untracked and ignored loadable files; ignores ignored non-code files
+    ok 1 - reports modified, untracked and ignored loadable files; ignores ignored non-code files
+      ---
+      duration_ms: 64.310042
+      type: 'test'
+      ...
+    1..1
+ok 6 - dashboard data: git probe
+  ---
+  duration_ms: 64.349209
+  type: 'suite'
+  ...
+# Subtest: dashboard data: discovery cleanliness gate
+    # Subtest: git status parsing: type changes, renames and ignored files; unknown entries fail closed
+    ok 1 - git status parsing: type changes, renames and ignored files; unknown entries fail closed
+      ---
+      duration_ms: 0.34525
+      type: 'test'
+      ...
+    # Subtest: a tracked test file replaced by a symlink blocks discovery before Playwright starts
+    ok 2 - a tracked test file replaced by a symlink blocks discovery before Playwright starts
+      ---
+      duration_ms: 42.90275
+      type: 'test'
+      ...
+    # Subtest: a modified file under apps/ blocks discovery before Playwright starts
+    ok 3 - a modified file under apps/ blocks discovery before Playwright starts
+      ---
+      duration_ms: 43.140917
+      type: 'test'
+      ...
+    # Subtest: untracked, ignored-loadable and modified configuration inputs also block discovery
+    ok 4 - untracked, ignored-loadable and modified configuration inputs also block discovery
+      ---
+      duration_ms: 208.973375
+      type: 'test'
+      ...
+    # Subtest: a clean repository passes the gate and discovery starts
+    ok 5 - a clean repository passes the gate and discovery starts
+      ---
+      duration_ms: 49.262375
+      type: 'test'
+      ...
+    1..5
+ok 7 - dashboard data: discovery cleanliness gate
+  ---
+  duration_ms: 344.720625
+  type: 'suite'
+  ...
+# Subtest: dashboard data: sanitization
+    # Subtest: only allowlisted fields are copied from the Playwright report
+    ok 1 - only allowlisted fields are copied from the Playwright report
+      ---
+      duration_ms: 0.808416
+      type: 'test'
+      ...
+    # Subtest: unsafe content in an approved document stops the build, naming the location only
+    ok 2 - unsafe content in an approved document stops the build, naming the location only
+      ---
+      duration_ms: 0.706875
+      type: 'test'
+      ...
+    # Subtest: each unsafe category is detected
+    ok 3 - each unsafe category is detected
+      ---
+      duration_ms: 0.212625
+      type: 'test'
+      ...
+    # Subtest: ordinary specification text is not flagged
+    ok 4 - ordinary specification text is not flagged
+      ---
+      duration_ms: 0.046042
+      type: 'test'
+      ...
+    1..4
+ok 8 - dashboard data: sanitization
+  ---
+  duration_ms: 1.8195
+  type: 'suite'
+  ...
+# Subtest: dashboard data: schema
+    # Subtest: a built snapshot is valid
+    ok 1 - a built snapshot is valid
+      ---
+      duration_ms: 0.068958
+      type: 'test'
+      ...
+    # Subtest: rejects an unknown top-level field
+    ok 2 - rejects an unknown top-level field
+      ---
+      duration_ms: 0.159542
+      type: 'test'
+      ...
+    # Subtest: rejects a CI run in schema 1.0
+    ok 3 - rejects a CI run in schema 1.0
+      ---
+      duration_ms: 0.060833
+      type: 'test'
+      ...
+    # Subtest: rejects local results presented as used
+    ok 4 - rejects local results presented as used
+      ---
+      duration_ms: 0.044959
+      type: 'test'
+      ...
+    # Subtest: rejects an invalid TC ID
+    ok 5 - rejects an invalid TC ID
+      ---
+      duration_ms: 0.044
+      type: 'test'
+      ...
+    # Subtest: rejects an unknown automation intent
+    ok 6 - rejects an unknown automation intent
+      ---
+      duration_ms: 0.045209
+      type: 'test'
+      ...
+    # Subtest: rejects linkage "linked" without test instances
+    ok 7 - rejects linkage "linked" without test instances
+      ---
+      duration_ms: 0.044542
+      type: 'test'
+      ...
+    # Subtest: rejects an absolute test file path
+    ok 8 - rejects an absolute test file path
+      ---
+      duration_ms: 0.045
+      type: 'test'
+      ...
+    # Subtest: rejects an extra field on a test instance
+    ok 9 - rejects an extra field on a test instance
+      ---
+      duration_ms: 0.044292
+      type: 'test'
+      ...
+    # Subtest: rejects a short commit SHA
+    ok 10 - rejects a short commit SHA
+      ---
+      duration_ms: 0.07775
+      type: 'test'
+      ...
+    # Subtest: rejects the previous schema version
+    ok 11 - rejects the previous schema version
+      ---
+      duration_ms: 0.043583
+      type: 'test'
+      ...
+    # Subtest: rejects an unknown plan section kind
+    ok 12 - rejects an unknown plan section kind
+      ---
+      duration_ms: 0.04075
+      type: 'test'
+      ...
+    # Subtest: rejects a canonical without its Purpose/Flow
+    ok 13 - rejects a canonical without its Purpose/Flow
+      ---
+      duration_ms: 0.039625
+      type: 'test'
+      ...
+    1..13
+ok 9 - dashboard data: schema
+  ---
+  duration_ms: 0.83275
+  type: 'suite'
+  ...
+1..9
+# tests 60
+# suites 9
+# pass 60
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1359.833

@@ -91,6 +91,9 @@ jobs:
       - name: Dashboard data tests
         run: npm run dashboard:test
 
+      - name: CI run record tests
+        run: npm run ci:test
+
       - name: Install dashboard dependencies
         run: npm --prefix reporting/dashboard ci
 

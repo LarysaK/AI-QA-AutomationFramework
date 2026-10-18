@@ -1,0 +1,195 @@
+{
+  "total_count": 1,
+  "jobs": [
+    {
+      "id": 117726803814,
+      "run_id": 39144953322,
+      "run_attempt": 1,
+      "name": "Verify",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-18T16:25:51Z",
+      "completed_at": "2026-10-18T16:29:30Z",
+      "labels": ["ubuntu-24.04"],
+      "runner_name": "GitHub Actions 1000000055",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-18T16:25:52Z",
+          "completed_at": "2026-10-18T16:25:54Z"
+        },
+        {
+          "name": "Check out",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-18T16:25:54Z",
+          "completed_at": "2026-10-18T16:25:55Z"
+        },
+        {
+          "name": "Set up Node.js (.nvmrc)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-18T16:25:55Z",
+          "completed_at": "2026-10-18T16:25:56Z"
+        },
+        {
+          "name": "Check Node.js version",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-18T16:25:56Z",
+          "completed_at": "2026-10-18T16:25:56Z"
+        },
+        {
+          "name": "Guard (no model credentials, no staged proposals)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-18T16:25:56Z",
+          "completed_at": "2026-10-18T16:25:56Z"
+        },
+        {
+          "name": "Install root dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-18T16:25:56Z",
+          "completed_at": "2026-10-18T16:25:59Z"
+        },
+        {
+          "name": "Install Playwright Chromium and system dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-18T16:25:59Z",
+          "completed_at": "2026-10-18T16:26:23Z"
+        },
+        {
+          "name": "Generate dashboard snapshot",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-18T16:26:23Z",
+          "completed_at": "2026-10-18T16:26:24Z"
+        },
+        {
+          "name": "Typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-18T16:26:24Z",
+          "completed_at": "2026-10-18T16:26:27Z"
+        },
+        {
+          "name": "Lint",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-10-18T16:26:27Z",
+          "completed_at": "2026-10-18T16:26:33Z"
+        },
+        {
+          "name": "Format check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-18T16:26:33Z",
+          "completed_at": "2026-10-18T16:26:36Z"
+        },
+        {
+          "name": "Agent validation and generator tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-18T16:26:36Z",
+          "completed_at": "2026-10-18T16:28:58Z"
+        },
+        {
+          "name": "Dashboard data tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-18T16:28:58Z",
+          "completed_at": "2026-10-18T16:29:00Z"
+        },
+        {
+          "name": "Install dashboard dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-18T16:29:00Z",
+          "completed_at": "2026-10-18T16:29:04Z"
+        },
+        {
+          "name": "Dashboard typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-18T16:29:04Z",
+          "completed_at": "2026-10-18T16:29:06Z"
+        },
+        {
+          "name": "Dashboard lint",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-18T16:29:06Z",
+          "completed_at": "2026-10-18T16:29:12Z"
+        },
+        {
+          "name": "Dashboard tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-18T16:29:12Z",
+          "completed_at": "2026-10-18T16:29:18Z"
+        },
+        {
+          "name": "Dashboard build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-18T16:29:18Z",
+          "completed_at": "2026-10-18T16:29:21Z"
+        },
+        {
+          "name": "Playwright tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-18T16:29:21Z",
+          "completed_at": "2026-10-18T16:29:25Z"
+        },
+        {
+          "name": "Post Set up Node.js (.nvmrc)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 37,
+          "started_at": "2026-10-18T16:29:25Z",
+          "completed_at": "2026-10-18T16:29:27Z"
+        },
+        {
+          "name": "Post Check out",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 38,
+          "started_at": "2026-10-18T16:29:27Z",
+          "completed_at": "2026-10-18T16:29:28Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 39,
+          "started_at": "2026-10-18T16:29:28Z",
+          "completed_at": "2026-10-18T16:29:28Z"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/LarysaK/AI-QA-AutomationFramework/reporting/ci/run-record.schema.json",
+  "title": "CI run record v1.0",
+  "description": "One completed verification job of the CI workflow on main, derived from GitHub Actions metadata and the machine-readable reports of that job. Only terminal results are representable; queued or in-progress runs, pull requests and other branches are not. Counts a tool did not report are null, never zero.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "kind",
+    "repository",
+    "workflow",
+    "job",
+    "run",
+    "trigger",
+    "commitSha",
+    "status",
+    "conclusion",
+    "timestamps",
+    "environment",
+    "steps",
+    "suites",
+    "playwright"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "kind": { "const": "ci-run" },
+    "repository": { "type": "string", "pattern": "^[A-Za-z0-9-]+/[A-Za-z0-9._-]+$" },
+    "workflow": { "$ref": "#/$defs/text" },
+    "job": { "const": "Verify" },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "attempt", "number", "url"],
+      "properties": {
+        "id": { "type": "integer", "minimum": 1 },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "number": { "type": "integer", "minimum": 1 },
+        "url": {
+          "type": "string",
+          "pattern": "^https://github\\.com/[A-Za-z0-9-]+/[A-Za-z0-9._-]+/actions/runs/[0-9]+$"
+        }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "ref"],
+      "properties": {
+        "event": { "enum": ["push", "workflow_dispatch"] },
+        "ref": { "const": "refs/heads/main" }
+      }
+    },
+    "commitSha": { "$ref": "#/$defs/sha1" },
+    "status": {
+      "description": "Status of the verification job. Records are written only for completed jobs.",
+      "const": "completed"
+    },
+    "conclusion": { "enum": ["success", "failure", "cancelled", "timed_out"] },
+    "timestamps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runCreatedAt", "jobStartedAt", "jobCompletedAt"],
+      "properties": {
+        "runCreatedAt": { "$ref": "#/$defs/instant" },
+        "jobStartedAt": { "$ref": "#/$defs/instant" },
+        "jobCompletedAt": { "$ref": "#/$defs/instant" }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runnerLabel", "node", "playwright"],
+      "properties": {
+        "runnerLabel": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9._-]+$" },
+        "node": { "type": ["string", "null"], "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "playwright": { "type": ["string", "null"], "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "conclusion"],
+        "properties": {
+          "name": { "$ref": "#/$defs/text" },
+          "conclusion": { "$ref": "#/$defs/stepConclusion" }
+        }
+      }
+    },
+    "suites": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/suite" }
+    },
+    "playwright": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/playwrightResults" }]
+    }
+  },
+  "$defs": {
+    "text": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "sha1": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "instant": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"
+    },
+    "stepConclusion": { "enum": ["success", "failure", "cancelled", "skipped"] },
+    "suiteId": { "enum": ["agents", "dashboard-data", "dashboard-frontend", "playwright"] },
+    "count": { "type": "integer", "minimum": 0 },
+    "optionalCount": {
+      "description": "Null when the tool does not report this category.",
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["passed", "failed", "flaky", "skipped", "todo", "cancelled", "total"],
+      "properties": {
+        "passed": { "$ref": "#/$defs/count" },
+        "failed": { "$ref": "#/$defs/count" },
+        "flaky": { "$ref": "#/$defs/optionalCount" },
+        "skipped": { "$ref": "#/$defs/count" },
+        "todo": { "$ref": "#/$defs/optionalCount" },
+        "cancelled": { "$ref": "#/$defs/optionalCount" },
+        "total": { "$ref": "#/$defs/count" }
+      }
+    },
+    "suite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "state", "counts", "durationMs", "startedAt"],
+      "properties": {
+        "id": { "$ref": "#/$defs/suiteId" },
+        "state": {
+          "description": "passed: completed without failures or retries. flaky: completed without failures, but some tests passed only on retry. failed: completed with failures or errors. not-run: the step did not run. incomplete: the step ran but its results are missing, unreadable or interrupted.",
+          "enum": ["passed", "flaky", "failed", "not-run", "incomplete"]
+        },
+        "counts": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/counts" }] },
+        "durationMs": { "type": ["integer", "null"], "minimum": 0 },
+        "startedAt": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/instant" }] }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": { "state": { "enum": ["not-run", "incomplete"] } }
+          },
+          "then": {
+            "type": "object",
+            "properties": { "counts": { "type": "null" }, "durationMs": { "type": "null" } }
+          },
+          "else": {
+            "type": "object",
+            "properties": { "counts": { "type": "object" } }
+          }
+        }
+      ]
+    },
+    "playwrightResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instanceId", "project", "status", "attempts"],
+      "properties": {
+        "instanceId": { "type": "string", "pattern": "^[0-9a-f]+-[0-9a-f]+$" },
+        "project": { "$ref": "#/$defs/text" },
+        "status": { "enum": ["passed", "failed", "flaky", "skipped"] },
+        "attempts": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "playwrightResults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["failOnFlakyTests", "globalErrors", "results"],
+      "properties": {
+        "failOnFlakyTests": { "type": "boolean" },
+        "globalErrors": { "$ref": "#/$defs/count" },
+        "results": {
+          "type": "array",
+          "maxItems": 2000,
+          "items": { "$ref": "#/$defs/playwrightResult" }
+        }
+      }
+    },
+    "suiteResults": {
+      "description": "Written by the verification job itself: each suite's step outcome and what its report shows. Input to the run record, not published on its own.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "node", "playwrightVersion", "suites", "playwright"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "kind": { "const": "suite-results" },
+        "node": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "playwrightVersion": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "suites": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "required": ["outcome", "suite"],
+            "additionalProperties": false,
+            "properties": {
+              "outcome": { "$ref": "#/$defs/stepConclusion" },
+              "suite": { "$ref": "#/$defs/suite" }
+            }
+          }
+        },
+        "playwright": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/playwrightResults" }]
+        }
+      }
+    }
+  }
+}
