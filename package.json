@@ -18,7 +18,9 @@
     "agents:test": "tsx --test agents/orchestrator/validation/validate.test.ts agents/orchestrator/validation/trace-guard.test.ts agents/orchestrator/validation/static-guard.test.ts agents/orchestrator/validation/discovery-guard.test.ts agents/orchestrator/validation/run-guard.test.ts agents/orchestrator/validation/cli.test.ts agents/orchestrator/generator/generator.test.ts agents/orchestrator/generator/eslint-boundary.test.ts",
     "agents:generate": "tsx agents/orchestrator/generator/cli.ts",
     "dashboard:data": "tsx reporting/dashboard-data/cli.ts",
-    "dashboard:test": "tsx --test reporting/dashboard-data/dashboard-data.test.ts"
+    "dashboard:test": "tsx --test reporting/dashboard-data/dashboard-data.test.ts",
+    "ci:collect": "tsx reporting/ci/cli.ts",
+    "ci:test": "tsx --test reporting/ci/ci.test.ts"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

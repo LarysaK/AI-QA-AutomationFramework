@@ -1,0 +1,17 @@
+import { expect, test } from '@playwright/test';
+
+test('passes', () => {
+  expect(1).toBe(1);
+});
+
+test('fails on every attempt', () => {
+  expect(1).toBe(2);
+});
+
+test('flaky: fails first, passes on retry', ({}, testInfo) => {
+  expect(testInfo.retry).toBe(1);
+});
+
+test('skipped', () => {
+  test.skip(true, 'not applicable');
+});
