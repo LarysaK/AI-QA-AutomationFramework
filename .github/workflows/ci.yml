@@ -1,0 +1,112 @@
+# Verify-only CI (Phase 5.3 M1): runs the repository's existing automated checks.
+#
+# - No secrets, no model API calls, no H7 execution authorization, no staged AI proposals
+#   (artifacts/ is gitignored, so proposals cannot exist in a checkout).
+# - Read-only token; never pull_request_target, so pull requests from forks run untrusted
+#   code without secrets or write access.
+# - No artifacts are uploaded; reports, traces and the generated snapshot stay on the runner.
+# - Execution history and deployment are later milestones.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Nothing by default; each job grants only what it needs.
+permissions: {}
+
+# One run per pull request or branch. Superseded pull-request runs are cancelled; runs on main
+# are never cancelled.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js (.nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            reporting/dashboard/package-lock.json
+
+      # The dashboard requires Node ^22.22.2 (jsdom); .nvmrc only says 22.
+      - name: Check Node.js version
+        run: |
+          node --version
+          node -e "const [a, b, c] = process.versions.node.split('.').map(Number); if (a < 22 || (a === 22 && (b < 22 || (b === 22 && c < 2)))) { console.error('::error::Node.js >= 22.22.2 is required'); process.exit(1); }"
+
+      - name: Guard (no model credentials, no staged proposals)
+        run: |
+          if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "::error::ANTHROPIC_API_KEY must not be set in CI"
+            exit 1
+          fi
+          if [ -e artifacts/proposals ]; then
+            echo "::error::staged AI proposals must not exist in CI"
+            exit 1
+          fi
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium and system dependencies
+        run: npx playwright install --with-deps chromium
+
+      # First check that needs the snapshot inputs: the cleanliness gate requires every discovery
+      # input to be committed and unmodified, which a fresh checkout guarantees.
+      - name: Generate dashboard snapshot
+        run: npm run dashboard:data
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Agent validation and generator tests
+        run: npm run agents:test
+
+      - name: Dashboard data tests
+        run: npm run dashboard:test
+
+      - name: Install dashboard dependencies
+        run: npm --prefix reporting/dashboard ci
+
+      - name: Dashboard typecheck
+        run: npm --prefix reporting/dashboard run typecheck
+
+      - name: Dashboard lint
+        run: npm --prefix reporting/dashboard run lint
+
+      - name: Dashboard tests
+        run: npm --prefix reporting/dashboard run test
+
+      - name: Dashboard build
+        run: npm --prefix reporting/dashboard run build
+
+      # CI is set by the runner: Playwright starts a fresh RequestFlow server, forbids .only,
+      # retries once and uses two workers (playwright.config.ts).
+      - name: Playwright tests
+        run: npm test
