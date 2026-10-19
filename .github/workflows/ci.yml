@@ -5,7 +5,8 @@
 # - Read-only token; never pull_request_target, so pull requests from forks run untrusted
 #   code without secrets or write access.
 # - No artifacts are uploaded; reports, traces and the generated snapshot stay on the runner.
-# - Execution history and deployment are later milestones.
+# - Machine-readable test reports are captured in artifacts/ci/ (gitignored) and summarized as
+#   counts by the final step; storing execution history and deployment are later milestones.
 
 name: CI
 
@@ -65,6 +66,12 @@ jobs:
             exit 1
           fi
 
+      # A fresh, gitignored folder for this run's machine-readable reports.
+      - name: Prepare CI report folder
+        run: |
+          rm -rf artifacts/ci
+          mkdir -p artifacts/ci
+
       - name: Install root dependencies
         run: npm ci
 
@@ -85,11 +92,22 @@ jobs:
       - name: Format check
         run: npm run format:check
 
+      # node:test writes TAP when stdout is not a terminal; tee keeps it in the log and saves a
+      # copy. --silent keeps npm's script banner out of the TAP stream. pipefail makes the step
+      # fail when the tests fail, even though tee succeeds.
       - name: Agent validation and generator tests
-        run: npm run agents:test
+        id: agents
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run --silent agents:test | tee artifacts/ci/agents.tap
 
       - name: Dashboard data tests
-        run: npm run dashboard:test
+        id: dashboard_data
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run --silent dashboard:test | tee artifacts/ci/dashboard-data.tap
 
       - name: CI run record tests
         run: npm run ci:test
@@ -103,8 +121,10 @@ jobs:
       - name: Dashboard lint
         run: npm --prefix reporting/dashboard run lint
 
+      # The default reporter keeps the console output; the JSON reporter writes the report.
       - name: Dashboard tests
-        run: npm --prefix reporting/dashboard run test
+        id: frontend
+        run: npm --prefix reporting/dashboard run test -- --reporter=default --reporter=json --outputFile.json="$GITHUB_WORKSPACE/artifacts/ci/dashboard-frontend.vitest.json"
 
       - name: Dashboard build
         run: npm --prefix reporting/dashboard run build
@@ -112,4 +132,31 @@ jobs:
       # CI is set by the runner: Playwright starts a fresh RequestFlow server, forbids .only,
       # retries once and uses two workers (playwright.config.ts).
       - name: Playwright tests
+        id: playwright
         run: npm test
+
+      # Always runs, after failures and cancellations too, but never changes the job's result:
+      # continue-on-error confines a collector failure to this step, and a failed test step still
+      # fails the job. Step outcomes arrive through env, never interpolated into the script. The
+      # collector validates and safety-scans the suite results; the summary shows counts only.
+      - name: Collect suite results
+        id: collect
+        if: always()
+        continue-on-error: true
+        shell: bash
+        env:
+          CI_OUTCOME_AGENTS: ${{ steps.agents.outcome }}
+          CI_OUTCOME_DASHBOARD_DATA: ${{ steps.dashboard_data.outcome }}
+          CI_OUTCOME_DASHBOARD_FRONTEND: ${{ steps.frontend.outcome }}
+          CI_OUTCOME_PLAYWRIGHT: ${{ steps.playwright.outcome }}
+        run: |
+          set -euo pipefail
+          if [ -f artifacts/results/results.json ]; then
+            cp artifacts/results/results.json artifacts/ci/playwright.json
+          fi
+          if npm run -s ci:collect -- suites --reports artifacts/ci --outcomes-env CI_OUTCOME_ --out artifacts/ci/suite-results.json; then
+            npm run -s ci:collect -- summary --suites artifacts/ci/suite-results.json >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf '### CI suite results\n\nNot available: the collector could not produce trustworthy suite results (see the "Collect suite results" step log).\n' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
