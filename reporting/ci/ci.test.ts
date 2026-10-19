@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { after, describe, test } from 'node:test';
@@ -9,6 +9,8 @@ import {
   CollectError,
   collectSuites,
   composeRecord,
+  OUTCOME_SUFFIXES,
+  outcomesFrom,
   REPORT_FILES,
   type ReportInput,
   serializeRecord,
@@ -18,7 +20,9 @@ import {
   SUITE_STEPS,
   suiteFor,
   type SuiteId,
+  summarizeSuiteResults,
   validateRecord,
+  validateSuiteResults,
 } from './collect';
 import {
   type CompleteReport,
@@ -945,5 +949,432 @@ describe('CLI', () => {
     assert.equal(refused.status, 1);
     assert.match(refused.stderr, /not recorded/);
     assert.equal(existsSync(join(dir, 'refused.json')), false);
+  });
+});
+
+// ---------------------------------------------------------------- M3a: capture and collection
+
+describe('suite state matrix (report × step outcome)', () => {
+  const REPORTS: Record<string, ReportInput> = {
+    missing: { kind: 'missing' },
+    unreadable: { kind: 'present', text: read('tap/mixed.tap').split('# tests')[0] ?? '' },
+    passing: { kind: 'present', text: read('tap/repository-pass.tap') },
+    failing: { kind: 'present', text: read('tap/mixed.tap') },
+  };
+  // Expected state, or an error pattern for contradictions.
+  const EXPECTED: Record<string, Record<StepConclusion, string | RegExp>> = {
+    missing: {
+      success: /wrote no report/,
+      failure: 'incomplete',
+      cancelled: 'incomplete',
+      skipped: 'not-run',
+    },
+    unreadable: {
+      success: /unusable/,
+      failure: 'incomplete',
+      cancelled: 'incomplete',
+      skipped: /stale report/,
+    },
+    passing: {
+      success: 'passed',
+      failure: /failed but its report says the suite passed/,
+      cancelled: 'incomplete',
+      skipped: /stale report/,
+    },
+    failing: {
+      success: /succeeded but its report says the suite failed/,
+      failure: 'failed',
+      cancelled: 'incomplete',
+      skipped: /stale report/,
+    },
+  };
+  for (const [kind, byOutcome] of Object.entries(EXPECTED)) {
+    for (const [outcome, expected] of Object.entries(byOutcome) as [
+      StepConclusion,
+      string | RegExp,
+    ][]) {
+      test(`${kind} report, ${outcome} step → ${String(expected)}`, () => {
+        const report = REPORTS[kind];
+        assert.ok(report);
+        if (expected instanceof RegExp) {
+          assert.match(
+            problemsOf(() => suiteFor('agents', outcome, report)),
+            expected,
+          );
+          return;
+        }
+        const { suite } = suiteFor('agents', outcome, report);
+        assert.equal(suite.state, expected);
+        if (expected === 'incomplete' || expected === 'not-run') {
+          assert.equal(suite.counts, null, 'never zero-filled');
+          assert.equal(suite.durationMs, null);
+        } else {
+          assert.ok(suite.counts && suite.counts.total > 0, 'real counts are kept');
+        }
+      });
+    }
+  }
+});
+
+describe('step outcomes from the environment', () => {
+  const env = (
+    overrides: Record<string, string | undefined> = {},
+  ): Record<string, string | undefined> => ({
+    CI_OUTCOME_AGENTS: 'success',
+    CI_OUTCOME_DASHBOARD_DATA: 'failure',
+    CI_OUTCOME_DASHBOARD_FRONTEND: 'skipped',
+    CI_OUTCOME_PLAYWRIGHT: 'cancelled',
+    ...overrides,
+  });
+  const key = (id: SuiteId): string => `CI_OUTCOME_${OUTCOME_SUFFIXES[id]}`;
+
+  test('reads one variable per suite', () => {
+    assert.deepEqual(outcomesFrom(env(), key), {
+      agents: 'success',
+      'dashboard-data': 'failure',
+      'dashboard-frontend': 'skipped',
+      playwright: 'cancelled',
+    });
+  });
+
+  test('missing, empty or unknown values are errors, never defaults', () => {
+    assert.match(
+      problemsOf(() => outcomesFrom(env({ CI_OUTCOME_AGENTS: undefined }), key)),
+      /CI_OUTCOME_AGENTS is not set/,
+    );
+    assert.match(
+      problemsOf(() => outcomesFrom(env({ CI_OUTCOME_PLAYWRIGHT: '' }), key)),
+      /CI_OUTCOME_PLAYWRIGHT is not set/,
+    );
+    assert.match(
+      problemsOf(() => outcomesFrom(env({ CI_OUTCOME_DASHBOARD_DATA: 'neutral' }), key)),
+      /"neutral"/,
+    );
+  });
+});
+
+describe('job summary', () => {
+  test('counts only, with "—" for categories that were not reported or did not run', () => {
+    const results = collectSuites({
+      outcomes: {
+        agents: 'success',
+        'dashboard-data': 'failure',
+        'dashboard-frontend': 'skipped',
+        playwright: 'skipped',
+      },
+      reports: {
+        agents: { kind: 'present', text: read('tap/repository-pass.tap') },
+        'dashboard-data': { kind: 'missing' },
+        'dashboard-frontend': { kind: 'missing' },
+        playwright: { kind: 'missing' },
+      },
+      node: '22.23.3',
+    });
+    const summary = summarizeSuiteResults(results);
+    const agents = complete(parseNodeTap(read('tap/repository-pass.tap'))).counts;
+    assert.match(summary, /^### CI suite results$/m);
+    assert.ok(
+      summary.includes(
+        `| Agent validation and generator tests | success | passed | ${String(agents.passed)} | 0 | — | 0 | 0 | 0 | ${String(agents.total)} |`,
+      ),
+      summary,
+    );
+    assert.ok(
+      summary.includes(
+        '| Dashboard data tests | failure | incomplete | — | — | — | — | — | — | — |',
+      ),
+      summary,
+    );
+    assert.ok(
+      summary.includes('| Playwright tests | skipped | not-run | — | — | — | — | — | — | — |'),
+      summary,
+    );
+    assert.doesNotMatch(summary, /\/home\/|fixture-src|\.ts:|Error:/);
+  });
+
+  test('includes Playwright global errors when the report has them', () => {
+    const results = collectSuites({
+      outcomes: {
+        agents: 'skipped',
+        'dashboard-data': 'skipped',
+        'dashboard-frontend': 'skipped',
+        playwright: 'failure',
+      },
+      reports: {
+        agents: { kind: 'missing' },
+        'dashboard-data': { kind: 'missing' },
+        'dashboard-frontend': { kind: 'missing' },
+        playwright: { kind: 'present', text: read('playwright/import-error.json') },
+      },
+      node: '22.23.3',
+    });
+    assert.match(summarizeSuiteResults(results), /Playwright global errors: 2/);
+  });
+
+  test('refuses invalid suite results', () => {
+    assert.match(
+      problemsOf(() => summarizeSuiteResults({ kind: 'suite-results' })),
+      /suite results/,
+    );
+  });
+});
+
+// The workflow's own run scripts, extracted from ci.yml.
+const WORKFLOW = readFileSync(join(REPO, '.github/workflows/ci.yml'), 'utf8');
+
+function stepBlock(name: string): string {
+  const lines = WORKFLOW.split('\n');
+  const start = lines.findIndex((line) => line === `      - name: ${name}`);
+  assert.ok(start >= 0, `step "${name}" not found`);
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((line) => /^ {6}(- name:|# )/.test(line));
+  return [lines[start], ...(end === -1 ? rest : rest.slice(0, end))].join('\n');
+}
+
+function runScript(name: string): string {
+  const block = stepBlock(name).split('\n');
+  const at = block.findIndex((line) => /^ {8}run: /.test(line));
+  assert.ok(at >= 0, `step "${name}" has no run`);
+  const first = block[at]?.replace(/^ {8}run: /, '') ?? '';
+  if (first !== '|') return first;
+  return block
+    .slice(at + 1)
+    .filter((line) => line.startsWith('          ') || line === '')
+    .map((line) => line.slice(10))
+    .join('\n')
+    .trim();
+}
+
+/** GitHub's `shell: bash` (bash --noprofile --norc -eo pipefail {0}) and its default shell (bash -e {0}). */
+function bash(script: string, cwd: string, env: Record<string, string> = {}, defaultShell = false) {
+  const args = defaultShell
+    ? ['-e', '-c', script]
+    : ['--noprofile', '--norc', '-eo', 'pipefail', '-c', script];
+  return spawnSync('bash', args, {
+    cwd,
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'] ?? '', ...env },
+  });
+}
+
+describe('workflow capture steps', () => {
+  test('the suite steps have stable IDs; only the collect step may continue on error', () => {
+    for (const [name, id] of [
+      ['Agent validation and generator tests', 'agents'],
+      ['Dashboard data tests', 'dashboard_data'],
+      ['Dashboard tests', 'frontend'],
+      ['Playwright tests', 'playwright'],
+      ['Collect suite results', 'collect'],
+    ]) {
+      assert.match(stepBlock(name ?? ''), new RegExp(`^ {8}id: ${id ?? ''}$`, 'm'), name);
+    }
+    assert.equal(WORKFLOW.match(/continue-on-error:/g)?.length, 1);
+    assert.match(stepBlock('Collect suite results'), /^ {8}continue-on-error: true$/m);
+    assert.match(stepBlock('Collect suite results'), /^ {8}if: always\(\)$/m);
+  });
+
+  test('a fresh report folder is prepared before any suite runs', () => {
+    assert.equal(
+      runScript('Prepare CI report folder'),
+      'rm -rf artifacts/ci\nmkdir -p artifacts/ci',
+    );
+    assert.ok(
+      WORKFLOW.indexOf('- name: Prepare CI report folder') <
+        WORKFLOW.indexOf('- name: Agent validation and generator tests'),
+    );
+  });
+
+  test('TAP steps keep failures with pipefail, and still save the report', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ci-capture-'));
+    dirs.push(dir);
+    mkdirSync(join(dir, 'artifacts/ci'), { recursive: true });
+    for (const [name, command, file] of [
+      ['Agent validation and generator tests', 'npm run --silent agents:test', 'agents.tap'],
+      ['Dashboard data tests', 'npm run --silent dashboard:test', 'dashboard-data.tap'],
+    ] as const) {
+      const script = runScript(name);
+      assert.ok(script.includes(`${command} | tee artifacts/ci/${file}`), script);
+      assert.match(stepBlock(name), /^ {8}shell: bash$/m);
+      const failing = script.replace(
+        command,
+        `node -e "process.stdout.write('TAP version 13\\n'); process.exit(3)"`,
+      );
+      const passing = script.replace(
+        command,
+        `node -e "process.stdout.write('TAP version 13\\n')"`,
+      );
+      for (const defaultShell of [false, true]) {
+        assert.notEqual(
+          bash(failing, dir, {}, defaultShell).status,
+          0,
+          `${name} must fail when the tests fail`,
+        );
+        assert.equal(readFileSync(join(dir, 'artifacts/ci', file), 'utf8'), 'TAP version 13\n');
+        assert.equal(bash(passing, dir, {}, defaultShell).status, 0);
+      }
+      // Without pipefail the same pipeline would hide the failure, which is why the step sets it.
+      assert.equal(bash(failing.replace('set -o pipefail\n', ''), dir, {}, true).status, 0);
+    }
+  });
+
+  test("npm's script banner would corrupt the TAP stream, so the piped steps run npm --silent", () => {
+    const withBanner = `\n> ai-qa-automation@0.1.0 agents:test\n> tsx --test x.test.ts\n\n${read('tap/repository-pass.tap')}`;
+    rejected(parseNodeTap(withBanner), /not a TAP version 13 stream/);
+    for (const name of ['Agent validation and generator tests', 'Dashboard data tests']) {
+      assert.match(runScript(name), /^npm run --silent \S+ \| tee /m, name);
+    }
+  });
+
+  test('the Vitest step keeps its console reporter and writes the JSON report', () => {
+    const script = runScript('Dashboard tests');
+    assert.match(
+      script,
+      /--reporter=default --reporter=json --outputFile\.json="\$GITHUB_WORKSPACE\/artifacts\/ci\/dashboard-frontend\.vitest\.json"/,
+    );
+  });
+
+  test('no expressions in scripts; outcomes arrive through env; no uploads or new permissions', () => {
+    const names = WORKFLOW.split('\n').flatMap(
+      (line) => /^ {6}- name: (.+)$/.exec(line)?.[1] ?? [],
+    );
+    const scripts = names.filter((name) => /^ {8}run: /m.test(stepBlock(name))).map(runScript);
+    assert.ok(scripts.length >= 18, String(scripts.length));
+    assert.ok(
+      scripts.every((script) => !script.includes('${{')),
+      'no ${{ }} inside run scripts',
+    );
+    const collect = stepBlock('Collect suite results');
+    for (const [variable, id] of [
+      ['CI_OUTCOME_AGENTS', 'agents'],
+      ['CI_OUTCOME_DASHBOARD_DATA', 'dashboard_data'],
+      ['CI_OUTCOME_DASHBOARD_FRONTEND', 'frontend'],
+      ['CI_OUTCOME_PLAYWRIGHT', 'playwright'],
+    ]) {
+      assert.ok(
+        collect.includes(`          ${variable ?? ''}: \${{ steps.${id ?? ''}.outcome }}`),
+        variable,
+      );
+    }
+    const code = WORKFLOW.split('\n')
+      .filter((line) => !line.trim().startsWith('#'))
+      .join('\n');
+    assert.doesNotMatch(
+      code,
+      /upload-artifact|download-artifact|secrets\.|pull_request_target|:\s*write/,
+    );
+    assert.match(code, /^permissions: \{\}$/m);
+    assert.match(code, /^ {4}permissions:\n {6}contents: read$/m);
+  });
+});
+
+describe('workflow collect step (executed)', () => {
+  const COLLECT = runScript('Collect suite results').replaceAll(
+    'npm run -s ci:collect --',
+    `${join(REPO, 'node_modules/.bin/tsx')} ${join(__dirname, 'cli.ts')}`,
+  );
+  const SOURCES: Record<SuiteId, string> = {
+    agents: 'tap/repository-pass.tap',
+    'dashboard-data': 'tap/repository-pass.tap',
+    'dashboard-frontend': 'vitest/repository-pass.json',
+    playwright: 'playwright/repository-pass.json',
+  };
+
+  function workspace(present: SuiteId[]): string {
+    const dir = mkdtempSync(join(tmpdir(), 'ci-collect-step-'));
+    dirs.push(dir);
+    mkdirSync(join(dir, 'artifacts/ci'), { recursive: true });
+    for (const id of present) {
+      if (id === 'playwright') {
+        mkdirSync(join(dir, 'artifacts/results'), { recursive: true });
+        writeFileSync(join(dir, 'artifacts/results/results.json'), read(SOURCES[id]));
+      } else {
+        writeFileSync(join(dir, 'artifacts/ci', REPORT_FILES[id]), read(SOURCES[id]));
+      }
+    }
+    writeFileSync(join(dir, 'summary.md'), '');
+    return dir;
+  }
+
+  const run = (dir: string, outcomes: Record<SuiteId, string>) =>
+    bash(COLLECT, dir, {
+      GITHUB_STEP_SUMMARY: join(dir, 'summary.md'),
+      ...Object.fromEntries(
+        SUITE_IDS.map((id) => [`CI_OUTCOME_${OUTCOME_SUFFIXES[id]}`, outcomes[id]]),
+      ),
+    });
+
+  test('all suites passed: copies the Playwright report, writes suite results and a summary', () => {
+    const dir = workspace([...SUITE_IDS]);
+    const result = run(dir, {
+      agents: 'success',
+      'dashboard-data': 'success',
+      'dashboard-frontend': 'success',
+      playwright: 'success',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(existsSync(join(dir, 'artifacts/ci/playwright.json')));
+    const results: unknown = JSON.parse(
+      readFileSync(join(dir, 'artifacts/ci/suite-results.json'), 'utf8'),
+    );
+    assert.deepEqual(validateSuiteResults(results), []);
+    assert.match(
+      readFileSync(join(dir, 'summary.md'), 'utf8'),
+      /\| Playwright tests \| success \| passed \|/,
+    );
+  });
+
+  test('a failed suite: completed suites keep their counts, missing reports are incomplete, later suites not-run', () => {
+    const dir = workspace(['agents']);
+    const result = run(dir, {
+      agents: 'success',
+      'dashboard-data': 'failure',
+      'dashboard-frontend': 'skipped',
+      playwright: 'skipped',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const results = JSON.parse(
+      readFileSync(join(dir, 'artifacts/ci/suite-results.json'), 'utf8'),
+    ) as {
+      suites: { suite: { id: string; state: string; counts: { total: number } | null } }[];
+    };
+    assert.deepEqual(
+      results.suites.map((s) => [s.suite.id, s.suite.state, s.suite.counts === null]),
+      [
+        ['agents', 'passed', false],
+        ['dashboard-data', 'incomplete', true],
+        ['dashboard-frontend', 'not-run', true],
+        ['playwright', 'not-run', true],
+      ],
+    );
+    assert.ok((results.suites[0]?.suite.counts?.total ?? 0) > 0);
+  });
+
+  test('a contradiction fails only this step and says so in the summary; nothing is written', () => {
+    const dir = workspace([]);
+    const result = run(dir, {
+      agents: 'success',
+      'dashboard-data': 'success',
+      'dashboard-frontend': 'success',
+      playwright: 'success',
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /wrote no report/);
+    assert.equal(existsSync(join(dir, 'artifacts/ci/suite-results.json')), false);
+    assert.match(
+      readFileSync(join(dir, 'summary.md'), 'utf8'),
+      /Not available: the collector could not produce trustworthy suite results/,
+    );
+  });
+
+  test('a missing step outcome is an error, not a default', () => {
+    const dir = workspace([...SUITE_IDS]);
+    const result = run(dir, {
+      agents: 'success',
+      'dashboard-data': 'success',
+      'dashboard-frontend': 'success',
+      playwright: '',
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /CI_OUTCOME_PLAYWRIGHT is not set/);
   });
 });

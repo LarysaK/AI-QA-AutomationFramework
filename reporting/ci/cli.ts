@@ -6,24 +6,30 @@ import {
   collectSuites,
   CollectError,
   composeRecord,
+  OUTCOME_SUFFIXES,
+  outcomesFrom,
   REPORT_FILES,
   type ReportInput,
   serializeRecord,
   snapshotReference,
-  type StepConclusion,
   SUITE_IDS,
   type SuiteId,
+  summarizeSuiteResults,
 } from './collect';
 
 /**
  * CI run record collector.
  *
  *   npm run ci:collect -- suites --reports <dir> --outcomes <file.json> --out <file.json>
+ *   npm run ci:collect -- suites --reports <dir> --outcomes-env CI_OUTCOME_ --out <file.json>
+ *   npm run ci:collect -- summary --suites <file.json>
  *   npm run ci:collect -- record --suites <file.json> --run <file.json> --jobs <file.json> \
  *                                --snapshot <file.json> --out <file.json>
  *
- * `suites` runs inside the verification job: step outcomes (`{ "<suite>": "success" | ... }`)
- * plus the reports in <dir> (see REPORT_FILES). `record` combines those suite results (a missing
+ * `suites` runs inside the verification job: step outcomes, either a JSON file
+ * (`{ "<suite>": "success" | ... }`) or environment variables named <prefix>AGENTS,
+ * <prefix>DASHBOARD_DATA, <prefix>DASHBOARD_FRONTEND and <prefix>PLAYWRIGHT, plus the reports in
+ * <dir> (see REPORT_FILES). `summary` prints a counts-only Markdown summary of suite results. `record` combines those suite results (a missing
  * file means the job never wrote them) with the Actions API run and jobs responses, the runner's
  * GITHUB_* environment and the dashboard snapshot of the same commit. Output is written only when
  * every check, the schema and the public-safety scan pass. Exit 0 on success, 1 otherwise.
@@ -63,22 +69,23 @@ function write(path: string, value: unknown): void {
   writeFileSync(path, serializeRecord(value));
 }
 
-const OUTCOMES: readonly StepConclusion[] = ['success', 'failure', 'cancelled', 'skipped'];
-
 try {
   const [mode, ...rest] = process.argv.slice(2);
   const opts = options(rest);
   if (mode === 'suites') {
     const reports = required(opts, 'reports');
-    const outcomesFile = readJson(required(opts, 'outcomes'));
-    const outcomes = {} as Record<SuiteId, StepConclusion>;
+    const prefix = opts.get('outcomes-env');
+    if ((prefix === undefined) === (opts.get('outcomes') === undefined)) {
+      throw new CollectError([
+        'usage: give exactly one of --outcomes <file> or --outcomes-env <prefix>',
+      ]);
+    }
+    const outcomes =
+      prefix !== undefined
+        ? outcomesFrom(process.env, (id) => `${prefix}${OUTCOME_SUFFIXES[id]}`)
+        : outcomesFrom(readJson(required(opts, 'outcomes')) as Record<string, unknown>, (id) => id);
     const inputs = {} as Record<SuiteId, ReportInput>;
     for (const id of SUITE_IDS) {
-      const outcome = (outcomesFile as Record<string, unknown>)[id];
-      if (!OUTCOMES.includes(outcome as StepConclusion)) {
-        throw new CollectError([`outcomes: ${id} must be one of ${OUTCOMES.join(', ')}`]);
-      }
-      outcomes[id] = outcome as StepConclusion;
       const file = join(reports, REPORT_FILES[id]);
       inputs[id] = existsSync(file)
         ? { kind: 'present', text: readFileSync(file, 'utf8') }
@@ -88,6 +95,8 @@ try {
       required(opts, 'out'),
       collectSuites({ outcomes, reports: inputs, node: process.versions.node }),
     );
+  } else if (mode === 'summary') {
+    process.stdout.write(summarizeSuiteResults(readJson(required(opts, 'suites'))));
   } else if (mode === 'record') {
     const suitesFile = required(opts, 'suites');
     const record = composeRecord({
@@ -100,7 +109,7 @@ try {
     });
     write(required(opts, 'out'), record);
   } else {
-    throw new CollectError(['usage: ci:collect suites|record --option value ...']);
+    throw new CollectError(['usage: ci:collect suites|summary|record --option value ...']);
   }
 } catch (error) {
   if (error instanceof CollectError) {

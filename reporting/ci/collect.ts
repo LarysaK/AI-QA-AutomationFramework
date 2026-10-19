@@ -222,6 +222,67 @@ export function collectSuites(input: {
   return results;
 }
 
+/**
+ * Step outcomes as the workflow passes them: one environment variable per suite, named
+ * `<prefix><SUITE>` (for example CI_OUTCOME_AGENTS), set from `steps.<id>.outcome`. Missing or
+ * unknown values are errors; nothing is assumed.
+ */
+export const OUTCOME_SUFFIXES: Readonly<Record<SuiteId, string>> = {
+  agents: 'AGENTS',
+  'dashboard-data': 'DASHBOARD_DATA',
+  'dashboard-frontend': 'DASHBOARD_FRONTEND',
+  playwright: 'PLAYWRIGHT',
+};
+
+const OUTCOMES: readonly StepConclusion[] = ['success', 'failure', 'cancelled', 'skipped'];
+
+export function outcomesFrom(
+  source: Readonly<Record<string, unknown>>,
+  keyFor: (id: SuiteId) => string,
+): Record<SuiteId, StepConclusion> {
+  const problems: string[] = [];
+  const outcomes = {} as Record<SuiteId, StepConclusion>;
+  for (const id of SUITE_IDS) {
+    const value = source[keyFor(id)];
+    if (OUTCOMES.includes(value as StepConclusion)) outcomes[id] = value as StepConclusion;
+    else {
+      problems.push(
+        `outcomes: ${keyFor(id)} is ${value === undefined || value === '' ? 'not set' : JSON.stringify(value)}; expected ${OUTCOMES.join(', ')}`,
+      );
+    }
+  }
+  if (problems.length > 0) throw new CollectError(problems);
+  return outcomes;
+}
+
+/** A counts-only Markdown summary of validated suite results, for the job summary. */
+export function summarizeSuiteResults(value: unknown): string {
+  const problems = validateSuiteResults(value);
+  if (problems.length > 0) throw new CollectError(['suite results:', ...problems]);
+  const results = value as SuiteResults;
+  const cell = (n: number | null | undefined): string =>
+    n === null || n === undefined ? '—' : String(n);
+  const rows = results.suites.map(({ outcome, suite }) => {
+    const c = suite.counts;
+    return `| ${SUITE_STEPS[suite.id]} | ${outcome} | ${suite.state} | ${cell(c?.passed)} | ${cell(c?.failed)} | ${cell(c?.flaky)} | ${cell(c?.skipped)} | ${cell(c?.todo)} | ${cell(c?.cancelled)} | ${cell(c?.total)} |`;
+  });
+  const lines = [
+    '### CI suite results',
+    '',
+    '| Suite | Step outcome | State | Passed | Failed | Flaky | Skipped | Todo | Cancelled | Total |',
+    '| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+    ...rows,
+    '',
+  ];
+  if (results.playwright !== null) {
+    lines.push(`Playwright global errors: ${String(results.playwright.globalErrors)}`, '');
+  }
+  lines.push(
+    'Counts come from the machine-readable reports of this job. "—" means the tool does not report that category, or the suite did not run or did not complete.',
+  );
+  return `${lines.join('\n')}\n`;
+}
+
 // ---------------------------------------------------------------- run record
 
 /** The runner environment variables the record is cross-checked against. */
