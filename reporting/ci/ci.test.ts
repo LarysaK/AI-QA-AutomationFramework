@@ -24,6 +24,10 @@ import {
   validateRecord,
   validateSuiteResults,
 } from './collect';
+import { contextToEnvironment } from './context';
+import './context.test';
+import { RUN_2_CONTEXT } from './context.test';
+import './history.test';
 import {
   type CompleteReport,
   type ParsedReport,
@@ -1376,5 +1380,120 @@ describe('workflow collect step (executed)', () => {
     });
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /CI_OUTCOME_PLAYWRIGHT is not set/);
+  });
+});
+
+// ---------------------------------------------------------------- M3b: explicit run context
+
+describe('run record from an explicit run context', () => {
+  test('the context gives exactly the record the runner environment gives', () => {
+    assert.equal(
+      serializeRecord(compose({ env: contextToEnvironment(RUN_2_CONTEXT) })),
+      serializeRecord(compose()),
+    );
+  });
+
+  test('the context is cross-checked against the API like the environment', () => {
+    assert.match(
+      problemsOf(() => compose({ env: contextToEnvironment({ ...RUN_2_CONTEXT, runAttempt: 2 }) })),
+      /attempt does not match/,
+    );
+    assert.match(
+      problemsOf(() =>
+        compose({ env: contextToEnvironment({ ...RUN_2_CONTEXT, headSha: 'a'.repeat(40) }) }),
+      ),
+      /head_sha does not match/,
+    );
+    assert.match(
+      problemsOf(() =>
+        compose({ env: contextToEnvironment({ ...RUN_2_CONTEXT, event: 'pull_request' }) }),
+      ),
+      /not recorded/,
+    );
+  });
+
+  const cli = (args: string[], env: Record<string, string>) =>
+    spawnSync(join(REPO, 'node_modules/.bin/tsx'), [join(__dirname, 'cli.ts'), ...args], {
+      cwd: REPO,
+      encoding: 'utf8',
+      env: { PATH: process.env['PATH'] ?? '', ...env },
+    });
+
+  test('CLI: --context replaces the process environment entirely; it is never merged', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ci-context-'));
+    dirs.push(dir);
+    writeFileSync(join(dir, 'suites.json'), serializeRecord(passingSuites()));
+    writeFileSync(join(dir, 'jobs.json'), JSON.stringify(jobsAroundFixtures()));
+    writeFileSync(join(dir, 'context.json'), JSON.stringify(RUN_2_CONTEXT));
+    const args = (out: string, context: boolean): string[] => [
+      'record',
+      '--suites',
+      join(dir, 'suites.json'),
+      '--run',
+      join(FIXTURES, 'github/run-39144953322.json'),
+      '--jobs',
+      join(dir, 'jobs.json'),
+      '--snapshot',
+      join(FIXTURES, 'snapshot/dashboard-data.json'),
+      '--out',
+      out,
+      ...(context ? ['--context', join(dir, 'context.json')] : []),
+    ];
+    // A conflicting environment, like a later workflow's own GITHUB_* variables.
+    const conflicting = {
+      ...ENV,
+      GITHUB_RUN_ID: '1',
+      GITHUB_EVENT_NAME: 'workflow_run',
+      GITHUB_SHA: 'b'.repeat(40),
+    };
+    const withContext = cli(args(join(dir, 'with.json'), true), conflicting);
+    assert.equal(withContext.status, 0, withContext.stderr);
+    assert.equal(readFileSync(join(dir, 'with.json'), 'utf8'), serializeRecord(compose()));
+    const withoutContext = cli(args(join(dir, 'without.json'), false), conflicting);
+    assert.equal(withoutContext.status, 1);
+    assert.equal(existsSync(join(dir, 'without.json')), false);
+    writeFileSync(
+      join(dir, 'bad-context.json'),
+      JSON.stringify({ ...RUN_2_CONTEXT, serverUrl: 'http://github.com' }),
+    );
+    const badContext = cli(
+      [...args(join(dir, 'bad.json'), false), '--context', join(dir, 'bad-context.json')],
+      ENV,
+    );
+    assert.equal(badContext.status, 1);
+    assert.match(badContext.stderr, /serverUrl must be https:\/\/github\.com/);
+    assert.equal(existsSync(join(dir, 'bad.json')), false);
+  });
+
+  test('CLI: context mode derives the context from a workflow_run event; refuses a fork and writes nothing', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ci-context-event-'));
+    dirs.push(dir);
+    const event = join(FIXTURES, 'github/workflow-run-event-39144953322.json');
+    const ok = cli(
+      ['context', '--event', event, '--workflow', 'CI', '--out', join(dir, 'context.json')],
+      {},
+    );
+    assert.equal(ok.status, 0, ok.stderr);
+    assert.deepEqual(JSON.parse(readFileSync(join(dir, 'context.json'), 'utf8')), RUN_2_CONTEXT);
+    const fork = json('github/workflow-run-event-39144953322.json');
+    (fork['workflow_run'] as Record<string, unknown>)['head_repository'] = {
+      full_name: 'someone/AI-QA-AutomationFramework',
+    };
+    writeFileSync(join(dir, 'fork.json'), JSON.stringify(fork));
+    const refused = cli(
+      [
+        'context',
+        '--event',
+        join(dir, 'fork.json'),
+        '--workflow',
+        'CI',
+        '--out',
+        join(dir, 'fork-context.json'),
+      ],
+      {},
+    );
+    assert.equal(refused.status, 1);
+    assert.match(refused.stderr, /a fork/);
+    assert.equal(existsSync(join(dir, 'fork-context.json')), false);
   });
 });

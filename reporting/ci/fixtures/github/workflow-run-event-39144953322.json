@@ -1,0 +1,26 @@
+{
+  "action": "completed",
+  "repository": {
+    "full_name": "LarysaK/AI-QA-AutomationFramework"
+  },
+  "workflow_run": {
+    "id": 39144953322,
+    "name": "CI",
+    "run_number": 2,
+    "run_attempt": 1,
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success",
+    "head_branch": "main",
+    "head_sha": "11f78cdab0e2b4a4b2e92de4bcace444502de158",
+    "html_url": "https://github.com/LarysaK/AI-QA-AutomationFramework/actions/runs/39144953322",
+    "created_at": "2026-10-18T16:25:48Z",
+    "repository": {
+      "full_name": "LarysaK/AI-QA-AutomationFramework"
+    },
+    "head_repository": {
+      "full_name": "LarysaK/AI-QA-AutomationFramework"
+    },
+    "display_title": "Merge pull request #1 from LarysaK/ci/verify-workflow"
+  }
+}
