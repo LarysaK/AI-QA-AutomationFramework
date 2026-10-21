@@ -25,3 +25,10 @@ The `sources/*.txt` files are kept as text so they are never compiled, linted or
 any test runner. To regenerate a report, copy the source to a temporary folder (for Playwright
 and Vitest, inside the package that provides the runner, so it can be resolved), run the command
 above, and replace machine-specific paths before committing.
+
+**Hand-off data (Phase 5.3 M3c) is synthetic.** `handoff.test.ts` derives, inside the tests, the
+attempt-scoped run and jobs responses (run #2's data plus `head_repository` and the three M3c
+steps), the artifact listings (IDs, digests, sizes and timestamps are invented) and the artifact
+contents (the snapshot above and suite results collected from the repository-pass reports). No
+run with hand-off artifacts, and no real `workflow_run` payload, has been observed yet; the
+first real dry run's field-shape table (`event-shape.mjs`) is how the event fixture is checked.

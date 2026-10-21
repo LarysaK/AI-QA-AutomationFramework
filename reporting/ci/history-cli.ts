@@ -35,13 +35,16 @@ import {
  * Offline CI history tool over a local directory (not a git checkout operation; no network).
  *
  *   npx tsx reporting/ci/history-cli.ts add --history <dir> --record <file>
+ *   npx tsx reporting/ci/history-cli.ts plan --history <dir> --record <file>
  *   npx tsx reporting/ci/history-cli.ts verify --history <dir>
  *
- * Both modes first verify the whole history: the layout, every record against the ci-run 1.0
+ * All modes first verify the whole history: the layout, every record against the ci-run 1.0
  * schema and the public-safety scan, canonical bytes and paths, and the index against its schema
  * and against the records. `add` then adds one validated record (a no-op if identical, an error
  * if a different record exists for the same run attempt) and rewrites the index. It prints
- * `{"action", "path", "sha256"}`. Exit 0 on success, 1 otherwise.
+ * `{"action", "path", "sha256"}`. `plan` is read-only: the same validation and decision as
+ * `add`, printing `{"action", "path", "sha256", "changed", "dryRun": true}`, but it writes no
+ * file, index, branch or ref. Exit 0 on success, 1 otherwise.
  *
  * Record files are created exclusively (a temporary file, then a hard link that fails if the
  * target exists), so an existing run-attempt record is never replaced, even if another process
@@ -230,19 +233,28 @@ if (require.main === module) {
       process.stdout.write(
         `${JSON.stringify({ verified: true, records: [...tree.keys()].filter((p) => p.startsWith('v1/runs/')).length })}\n`,
       );
-    } else if (mode === 'add') {
+    } else if (mode === 'add' || mode === 'plan') {
       const recordFile = option(args, 'record');
-      if (lstatSync(recordFile).size > MAX_RECORD_BYTES) {
+      const stat = lstatSync(recordFile);
+      if (!stat.isFile()) throw new HistoryError(['the new record is not a regular file']);
+      if (stat.size > MAX_RECORD_BYTES) {
         throw new HistoryError([`the new record is larger than ${String(MAX_RECORD_BYTES)} bytes`]);
       }
       const addition = addRecord(tree, readFileSync(recordFile, 'utf8'), safety);
-      const action = writeAddition(root, addition);
-      process.stdout.write(
-        `${JSON.stringify({ action, path: addition.path, sha256: addition.sha256 })}\n`,
-      );
+      if (mode === 'plan') {
+        // Read-only: the decision only; nothing is written.
+        process.stdout.write(
+          `${JSON.stringify({ action: addition.action, path: addition.path, sha256: addition.sha256, changed: addition.changed, dryRun: true })}\n`,
+        );
+      } else {
+        const action = writeAddition(root, addition);
+        process.stdout.write(
+          `${JSON.stringify({ action, path: addition.path, sha256: addition.sha256 })}\n`,
+        );
+      }
     } else {
       throw new HistoryError([
-        'usage: history-cli.ts add|verify --history <dir> [--record <file>]',
+        'usage: history-cli.ts add|plan|verify --history <dir> [--record <file>]',
       ]);
     }
   } catch (error) {

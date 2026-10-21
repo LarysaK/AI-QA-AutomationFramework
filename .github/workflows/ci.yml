@@ -4,9 +4,12 @@
 #   (artifacts/ is gitignored, so proposals cannot exist in a checkout).
 # - Read-only token; never pull_request_target, so pull requests from forks run untrusted
 #   code without secrets or write access.
-# - No artifacts are uploaded; reports, traces and the generated snapshot stay on the runner.
 # - Machine-readable test reports are captured in artifacts/ci/ (gitignored) and summarized as
-#   counts by the final step; storing execution history and deployment are later milestones.
+#   counts by the final steps. Raw reports, traces and Playwright output stay on the runner.
+# - Hand-off (Phase 5.3 M3c): push and workflow_dispatch runs on main upload exactly two small
+#   artifacts, the dashboard snapshot and the validated suite results, under names bound to the
+#   run attempt and kept for 7 days. Pull request runs upload nothing. The separate, read-only
+#   ci-history.yml workflow composes a run record from them; nothing is published.
 
 name: CI
 
@@ -81,6 +84,7 @@ jobs:
       # First check that needs the snapshot inputs: the cleanliness gate requires every discovery
       # input to be committed and unmodified, which a fresh checkout guarantees.
       - name: Generate dashboard snapshot
+        id: snapshot
         run: npm run dashboard:data
 
       - name: Typecheck
@@ -160,3 +164,30 @@ jobs:
             printf '### CI suite results\n\nNot available: the collector could not produce trustworthy suite results (see the "Collect suite results" step log).\n' >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
+
+      # Hand-off uploads run after every check, so an upload failure can never stop a check from
+      # running. Attempt-specific names: a re-run never replaces an earlier attempt's artifact,
+      # and the history workflow downloads only the names of the attempt it was triggered for.
+      # Skipped when the snapshot was not generated, which ci-history.yml reads as "never
+      # produced" only if the API also shows the generate step did not succeed.
+      - name: Upload dashboard snapshot
+        if: always() && steps.snapshot.outcome == 'success' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-snapshot-attempt-${{ github.run_attempt }}
+          path: artifacts/dashboard/dashboard-data.json
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: false
+
+      # Only results the collector validated: skipped when collection failed or did not run,
+      # which ci-history.yml reads as "never produced" (a record with incomplete suites).
+      - name: Upload suite results
+        if: always() && steps.collect.outcome == 'success' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-suite-results-attempt-${{ github.run_attempt }}
+          path: artifacts/ci/suite-results.json
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: false
