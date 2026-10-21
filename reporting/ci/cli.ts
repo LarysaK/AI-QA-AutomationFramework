@@ -16,6 +16,12 @@ import {
   type SuiteId,
   summarizeSuiteResults,
 } from './collect';
+import {
+  ContextError,
+  contextFromWorkflowRunEvent,
+  contextToEnvironment,
+  parseRunContext,
+} from './context';
 
 /**
  * CI run record collector.
@@ -25,13 +31,19 @@ import {
  *   npm run ci:collect -- summary --suites <file.json>
  *   npm run ci:collect -- record --suites <file.json> --run <file.json> --jobs <file.json> \
  *                                --snapshot <file.json> --out <file.json>
+ *                                [--context <file.json>]
+ *   npm run ci:collect -- context --event <workflow_run event.json> --workflow CI --out <file.json>
  *
  * `suites` runs inside the verification job: step outcomes, either a JSON file
  * (`{ "<suite>": "success" | ... }`) or environment variables named <prefix>AGENTS,
  * <prefix>DASHBOARD_DATA, <prefix>DASHBOARD_FRONTEND and <prefix>PLAYWRIGHT, plus the reports in
- * <dir> (see REPORT_FILES). `summary` prints a counts-only Markdown summary of suite results. `record` combines those suite results (a missing
- * file means the job never wrote them) with the Actions API run and jobs responses, the runner's
- * GITHUB_* environment and the dashboard snapshot of the same commit. Output is written only when
+ * <dir> (see REPORT_FILES). `summary` prints a counts-only Markdown summary of suite results.
+ *
+ * `record` combines those suite results (a missing file means the job never wrote them) with the
+ * Actions API run and jobs responses, the runner's GITHUB_* environment (or, with --context, an
+ * explicit run context that replaces the environment entirely) and the dashboard snapshot of the
+ * same commit. `context` derives a run context offline from a workflow_run event payload,
+ * refusing runs that may not be recorded. Output is written only when
  * every check, the schema and the public-safety scan pass. Exit 0 on success, 1 otherwise.
  */
 
@@ -103,16 +115,25 @@ try {
       suiteResults: existsSync(suitesFile) ? readJson(suitesFile) : null,
       run: readJson(required(opts, 'run')),
       jobs: readJson(required(opts, 'jobs')),
-      env: process.env,
+      // An explicit context replaces the process environment entirely; it is never merged.
+      env: opts.has('context')
+        ? contextToEnvironment(parseRunContext(readJson(required(opts, 'context'))))
+        : process.env,
       snapshot: snapshotReference(readJson(required(opts, 'snapshot'))),
       safety: defaultSafetyContext(repoRoot),
     });
     write(required(opts, 'out'), record);
+  } else if (mode === 'context') {
+    const context = contextFromWorkflowRunEvent(
+      readJson(required(opts, 'event')),
+      opts.get('workflow') ?? '',
+    );
+    write(required(opts, 'out'), context);
   } else {
-    throw new CollectError(['usage: ci:collect suites|summary|record --option value ...']);
+    throw new CollectError(['usage: ci:collect suites|summary|record|context --option value ...']);
   }
 } catch (error) {
-  if (error instanceof CollectError) {
+  if (error instanceof CollectError || error instanceof ContextError) {
     console.error(error.message);
     process.exit(1);
   }
