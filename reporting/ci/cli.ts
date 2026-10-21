@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
 import { defaultSafetyContext } from '../dashboard-data/sanitize';
@@ -44,7 +44,8 @@ import {
  * explicit run context that replaces the environment entirely) and the dashboard snapshot of the
  * same commit. `context` derives a run context offline from a workflow_run event payload,
  * refusing runs that may not be recorded. Output is written only when
- * every check, the schema and the public-safety scan pass. Exit 0 on success, 1 otherwise.
+ * every check, the schema and the public-safety scan pass. Every JSON input must be a regular
+ * file within MAX_INPUT_BYTES. Exit 0 on success, 1 otherwise.
  */
 
 const repoRoot = resolve(__dirname, '..', '..');
@@ -68,7 +69,21 @@ function required(map: Map<string, string>, key: string): string {
   return resolve(value);
 }
 
+/** Largest accepted JSON input (API responses, event payloads, snapshots, suite results). */
+const MAX_INPUT_BYTES = 16 * 1024 * 1024;
+
 function readJson(path: string): unknown {
+  let size: number;
+  try {
+    const stat = lstatSync(path);
+    if (!stat.isFile()) throw new Error('not a regular file');
+    size = stat.size;
+  } catch {
+    throw new CollectError([`${path} is missing or not a regular file`]);
+  }
+  if (size > MAX_INPUT_BYTES) {
+    throw new CollectError([`${path} is larger than ${String(MAX_INPUT_BYTES)} bytes`]);
+  }
   try {
     return JSON.parse(readFileSync(path, 'utf8'));
   } catch {

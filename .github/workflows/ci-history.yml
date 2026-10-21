@@ -1,0 +1,143 @@
+# CI history, dry run (Phase 5.3 M3c): composes the run record of a completed CI run from its
+# hand-off artifacts and checks it as a publisher would, without publishing anything.
+#
+# - Triggered by workflow_run, so it always runs this file and the scripts it calls from the
+#   default branch: trusted code. Nothing from the triggering run is executed; its artifacts
+#   are data, downloaded by ID and validated before use.
+# - Read-only: contents: read (checkout) and actions: read (run, jobs and artifact metadata,
+#   artifact download). No write permission, no secrets, no history branch, no ref, no Pages.
+# - Only completed push or workflow_dispatch runs on main of this repository; pull requests and
+#   forks are refused here and again by ci:collect context.
+# - Untrusted event values reach the job condition and the concurrency key only; scripts read
+#   the event file through validating tools, never through expression interpolation.
+# - Known limitation, a mandatory security review item before M3d adds any write-capable
+#   publishing workflow: download-artifact extracts each ZIP while streaming it and checks the
+#   digest only afterwards, and the size limit applies to the compressed archive, so it does not
+#   stop a decompression bomb (see reporting/ci/handoff.ts). Impact here: this job's disk and
+#   timeout only.
+
+name: CI history (dry run)
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+# Nothing by default; the job grants only what it needs.
+permissions: {}
+
+# One dry run per run attempt.
+concurrency:
+  group: ci-history-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+  cancel-in-progress: false
+
+jobs:
+  compose:
+    name: Compose run record (dry run)
+    if: >-
+      github.event.workflow_run.status == 'completed' &&
+      (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.repository.full_name == github.repository &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      # For workflow_run, the checked-out commit is the default branch's latest commit.
+      - name: Check out trusted default-branch code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js (.nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      # publish-check.mjs runs on plain Node.js, which strips TypeScript types from 22.18.
+      - name: Check Node.js version
+        run: |
+          node --version
+          node -e "const [a, b, c] = process.versions.node.split('.').map(Number); if (a < 22 || (a === 22 && (b < 22 || (b === 22 && c < 2)))) { console.error('::error::Node.js >= 22.22.2 is required'); process.exit(1); }"
+
+      # Dependency lifecycle scripts are not needed to compose a record.
+      - name: Install root dependencies
+        run: npm ci --ignore-scripts
+
+      # Presence, type and shape of the fields relied on; never values (see the script).
+      - name: Describe the event (field shapes only)
+        run: node reporting/ci/event-shape.mjs "$GITHUB_EVENT_PATH" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Derive run context
+        run: |
+          mkdir -p "$RUNNER_TEMP/ci-history"
+          npm run -s ci:collect -- context --event "$GITHUB_EVENT_PATH" --workflow CI --out "$RUNNER_TEMP/ci-history/context.json"
+
+      # Exact names for the triggering attempt; duplicates, missing or foreign artifacts fail.
+      # Outputs are integers (artifact IDs, run ID) or empty, written by the resolver.
+      - name: Resolve hand-off artifacts
+        id: resolve
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./node_modules/.bin/tsx reporting/ci/handoff-cli.ts resolve --work "$RUNNER_TEMP/ci-history"
+
+      - name: Download dashboard snapshot
+        if: steps.resolve.outputs.snapshot-id != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ steps.resolve.outputs.snapshot-id }}
+          run-id: ${{ steps.resolve.outputs.run-id }}
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/ci-history/download/snapshot
+          digest-mismatch: error
+
+      - name: Download suite results
+        if: steps.resolve.outputs.suites-id != '' && steps.resolve.outputs.recordable == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ steps.resolve.outputs.suites-id }}
+          run-id: ${{ steps.resolve.outputs.run-id }}
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/ci-history/download/suites
+          digest-mismatch: error
+
+      - name: Compose run record
+        if: steps.resolve.outputs.recordable == 'true'
+        run: ./node_modules/.bin/tsx reporting/ci/handoff-cli.ts compose --work "$RUNNER_TEMP/ci-history"
+
+      # Read-only plan against an empty history: no file, index, branch or ref is written.
+      - name: Plan history addition (dry run)
+        if: steps.resolve.outputs.recordable == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/ci-history"
+          mkdir -p "$work/empty-history"
+          ./node_modules/.bin/tsx reporting/ci/history-cli.ts plan --history "$work/empty-history" --record "$work/record.json" > "$work/plan.json.tmp"
+          mv "$work/plan.json.tmp" "$work/plan.json"
+
+      # The dependency-free check a future publisher runs before writing anything.
+      - name: Publisher pre-check (dry run)
+        if: steps.resolve.outputs.recordable == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/ci-history"
+          sha="$(node -p "JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).sha256" "$work/plan.json")"
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON reporting/ci/publish-check.mjs --event "$GITHUB_EVENT_PATH" --record "$work/record.json" --sha256 "$sha" --history "$work/empty-history" > "$work/check.json.tmp"
+          mv "$work/check.json.tmp" "$work/check.json"
+
+      - name: Job summary
+        if: always()
+        shell: bash
+        run: |
+          if ! ./node_modules/.bin/tsx reporting/ci/handoff-cli.ts summary --work "$RUNNER_TEMP/ci-history" >> "$GITHUB_STEP_SUMMARY"; then
+            printf '## CI history: DRY RUN\n\nNothing was published. The summary could not be produced (see the step logs).\n' >> "$GITHUB_STEP_SUMMARY"
+          fi

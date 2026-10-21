@@ -27,7 +27,9 @@ import {
 import { contextToEnvironment } from './context';
 import './context.test';
 import { RUN_2_CONTEXT } from './context.test';
+import './handoff.test';
 import './history.test';
+import './workflows.test';
 import {
   type CompleteReport,
   type ParsedReport,
@@ -1237,7 +1239,7 @@ describe('workflow capture steps', () => {
     );
   });
 
-  test('no expressions in scripts; outcomes arrive through env; no uploads or new permissions', () => {
+  test('no expressions in scripts; outcomes arrive through env; no downloads or new permissions', () => {
     const names = WORKFLOW.split('\n').flatMap(
       (line) => /^ {6}- name: (.+)$/.exec(line)?.[1] ?? [],
     );
@@ -1262,10 +1264,8 @@ describe('workflow capture steps', () => {
     const code = WORKFLOW.split('\n')
       .filter((line) => !line.trim().startsWith('#'))
       .join('\n');
-    assert.doesNotMatch(
-      code,
-      /upload-artifact|download-artifact|secrets\.|pull_request_target|:\s*write/,
-    );
+    // The two hand-off uploads (M3c) are checked exactly in workflows.test.ts.
+    assert.doesNotMatch(code, /download-artifact|secrets\.|pull_request_target|:\s*write/);
     assert.match(code, /^permissions: \{\}$/m);
     assert.match(code, /^ {4}permissions:\n {6}contents: read$/m);
   });
