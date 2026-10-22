@@ -31,7 +31,7 @@ import {
  *   context.json            ci:collect context, from the trusted workflow_run event
  *   api/*.json              Actions API responses for the triggering run attempt
  *   resolution.json         which artifacts to download, and which were never produced
- *   download/<kind>/        the downloaded artifacts (by ID, digest-checked by the action)
+ *   download/<kind>/        the raw downloaded artifacts (by ID, never extracted)
  *   record.json             the composed run record
  *   plan.json, check.json   history-cli plan and publish-check results
  *
@@ -142,15 +142,18 @@ export function composeStage(work: string): unknown {
   const context = readContext(work);
   // Re-derived from the saved responses, not read back from resolution.json.
   const resolution = resolveHandoff(context, readApi(join(work, 'api')));
-  if (!resolution.recordable) {
+  if (resolution.snapshot.state !== 'download') {
     throw new HandoffError(['the snapshot was never produced; no record is composed']);
   }
+  // Each download is verified against its listing (name, size, not ZIP, SHA-256) before parsing.
   const snapshot: unknown = JSON.parse(
-    readArtifactFile(join(work, 'download', 'snapshot'), 'snapshot'),
+    readArtifactFile(join(work, 'download', 'snapshot'), 'snapshot', resolution.snapshot),
   );
   let suiteResults: unknown = null;
   if (resolution.suites.state === 'download') {
-    suiteResults = JSON.parse(readArtifactFile(join(work, 'download', 'suites'), 'suites'));
+    suiteResults = JSON.parse(
+      readArtifactFile(join(work, 'download', 'suites'), 'suites', resolution.suites),
+    );
   } else if (existsSync(join(work, 'download', 'suites'))) {
     throw new HandoffError(['suite results were never produced, yet a download folder exists']);
   }
@@ -205,7 +208,8 @@ export function summaryStage(work: string): string {
     const state = at(resolution, kind, 'state');
     if (state === 'download' && at(resolution, 'recordable') === false)
       return 'present, not downloaded (no record without the snapshot)';
-    if (state === 'download') return 'downloaded (digest checked by the download action)';
+    if (state === 'download')
+      return 'downloaded raw (size and SHA-256 verified, nothing extracted)';
     if (state === 'not-produced')
       return kind === 'snapshot'
         ? 'never produced: the CI job did not generate the snapshot'

@@ -10,11 +10,9 @@
 #   forks are refused here and again by ci:collect context.
 # - Untrusted event values reach the job condition and the concurrency key only; scripts read
 #   the event file through validating tools, never through expression interpolation.
-# - Known limitation, a mandatory security review item before M3d adds any write-capable
-#   publishing workflow: download-artifact extracts each ZIP while streaming it and checks the
-#   digest only afterwards, and the size limit applies to the compressed archive, so it does not
-#   stop a decompression bomb (see reporting/ci/handoff.ts). Impact here: this job's disk and
-#   timeout only.
+# - No archive is ever extracted: the artifacts are raw JSON files, downloaded with
+#   skip-decompress and verified (exact name, size, not a ZIP, SHA-256 against the listed
+#   digest) before anything parses them (M3d-1).
 
 name: CI history (dry run)
 
@@ -96,6 +94,7 @@ jobs:
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/ci-history/download/snapshot
           digest-mismatch: error
+          skip-decompress: true
 
       - name: Download suite results
         if: steps.resolve.outputs.suites-id != '' && steps.resolve.outputs.recordable == 'true'
@@ -107,6 +106,7 @@ jobs:
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/ci-history/download/suites
           digest-mismatch: error
+          skip-decompress: true
 
       - name: Compose run record
         if: steps.resolve.outputs.recordable == 'true'

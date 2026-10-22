@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, test } from 'node:test';
 
-import { ARTIFACTS } from './handoff';
+import { ARTIFACTS, artifactName } from './handoff';
 
 /**
  * Structure of the two workflows (.github/workflows): triggers, permissions, pinned actions,
@@ -160,45 +161,108 @@ describe('workflows: CI artifact hand-off (ci.yml)', () => {
     assert.equal(code(CI).match(/upload-artifact/g)?.length, 2);
   });
 
-  test('the snapshot upload: after collection, only if the snapshot was generated, main push/dispatch only', () => {
+  const SNAPSHOT_IF = `always() && steps.snapshot.outcome == 'success' && ${MAIN_PUSH_OR_DISPATCH}`;
+  const SUITES_IF = `always() && steps.collect.outcome == 'success' && ${MAIN_PUSH_OR_DISPATCH}`;
+  const HANDOFF = [
+    {
+      kind: 'snapshot',
+      stage: 'Stage dashboard snapshot',
+      if: SNAPSHOT_IF,
+      source: 'artifacts/dashboard/dashboard-data.json',
+    },
+    {
+      kind: 'suites',
+      stage: 'Stage suite results',
+      if: SUITES_IF,
+      source: 'artifacts/ci/suite-results.json',
+    },
+  ] as const;
+
+  test('the hand-off is the last four steps, after collection: stage, then upload, per artifact', () => {
     assert.equal(step(CI, ARTIFACTS.snapshot.producerStep).id, 'snapshot');
-    const s = step(CI, ARTIFACTS.snapshot.uploadStep);
-    assert.equal(indexOf(CI, s.name), indexOf(CI, ARTIFACTS.suites.producerStep) + 1);
-    assert.equal(
-      s.if,
-      `always() && steps.snapshot.outcome == 'success' && ${MAIN_PUSH_OR_DISPATCH}`,
+    assert.deepEqual(
+      steps(CI)
+        .slice(-5)
+        .map((s) => s.name),
+      [
+        ARTIFACTS.suites.producerStep,
+        'Stage dashboard snapshot',
+        ARTIFACTS.snapshot.uploadStep,
+        'Stage suite results',
+        ARTIFACTS.suites.uploadStep,
+      ],
     );
-    assert.deepEqual(s.with, {
-      name: `${ARTIFACTS.snapshot.prefix}\${{ github.run_attempt }}`,
-      path: `artifacts/dashboard/${ARTIFACTS.snapshot.file}`,
-      'if-no-files-found': 'error',
-      'retention-days': '7',
-      overwrite: 'false',
-    });
   });
 
-  test('the suite-results upload: last, only after a successful collection, main push/dispatch only', () => {
-    const s = step(CI, ARTIFACTS.suites.uploadStep);
-    const all = steps(CI);
-    assert.equal(all.at(-1)?.name, s.name);
-    assert.equal(indexOf(CI, s.name), indexOf(CI, ARTIFACTS.snapshot.uploadStep) + 1);
-    assert.equal(
-      s.if,
-      `always() && steps.collect.outcome == 'success' && ${MAIN_PUSH_OR_DISPATCH}`,
-    );
-    assert.deepEqual(s.with, {
-      name: `${ARTIFACTS.suites.prefix}\${{ github.run_attempt }}`,
-      path: `artifacts/ci/${ARTIFACTS.suites.file}`,
-      'if-no-files-found': 'error',
-      'retention-days': '7',
-      overwrite: 'false',
-    });
+  test('each upload is one raw JSON file (archive: false) under its attempt-specific file name', () => {
+    for (const h of HANDOFF) {
+      const spec = ARTIFACTS[h.kind];
+      assert.equal(spec.file, h.source.split('/').at(-1));
+      const upload = step(CI, spec.uploadStep);
+      assert.equal(upload.if, h.if, spec.uploadStep);
+      // No `name`: with archive: false the artifact takes the file's name.
+      assert.deepEqual(upload.with, {
+        path: `artifacts/handoff/${spec.prefix}\${{ github.run_attempt }}.json`,
+        archive: 'false',
+        'if-no-files-found': 'error',
+        'retention-days': '7',
+        overwrite: 'false',
+      });
+      const stage = step(CI, h.stage);
+      assert.equal(stage.if, h.if, h.stage);
+      assert.equal(
+        stage.run,
+        `mkdir -p artifacts/handoff\ncp ${h.source} "artifacts/handoff/${spec.prefix}$GITHUB_RUN_ATTEMPT.json"`,
+      );
+    }
   });
 
-  test('an upload failure cannot stop a check: uploads come after every check and collection', () => {
+  test('the staging scripts write exactly the attempt-specific file the upload names (executed)', () => {
+    for (const attempt of ['1', '2']) {
+      const dir = mkdtempSync(join(tmpdir(), 'ci-handoff-stage-'));
+      try {
+        mkdirSync(join(dir, 'artifacts/dashboard'), { recursive: true });
+        mkdirSync(join(dir, 'artifacts/ci'), { recursive: true });
+        writeFileSync(join(dir, 'artifacts/dashboard/dashboard-data.json'), '{"snapshot":1}\n');
+        writeFileSync(join(dir, 'artifacts/ci/suite-results.json'), '{"suites":1}\n');
+        for (const h of HANDOFF) {
+          // GitHub's default shell for run steps: bash -e.
+          const result = spawnSync('bash', ['-e', '-c', step(CI, h.stage).run ?? ''], {
+            cwd: dir,
+            encoding: 'utf8',
+            env: { PATH: process.env['PATH'] ?? '', GITHUB_RUN_ATTEMPT: attempt },
+          });
+          assert.equal(result.status, 0, result.stderr);
+        }
+        assert.deepEqual(readdirSync(join(dir, 'artifacts/handoff')).sort(), [
+          artifactName('snapshot', Number(attempt)),
+          artifactName('suites', Number(attempt)),
+        ]);
+        assert.equal(
+          readFileSync(
+            join(dir, 'artifacts/handoff', artifactName('snapshot', Number(attempt))),
+            'utf8',
+          ),
+          '{"snapshot":1}\n',
+        );
+        // A missing source fails the staging step, so the upload has nothing to send.
+        rmSync(join(dir, 'artifacts/ci/suite-results.json'));
+        const failed = spawnSync('bash', ['-e', '-c', step(CI, 'Stage suite results').run ?? ''], {
+          cwd: dir,
+          encoding: 'utf8',
+          env: { PATH: process.env['PATH'] ?? '', GITHUB_RUN_ATTEMPT: attempt },
+        });
+        assert.notEqual(failed.status, 0);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  test('an upload failure cannot stop a check: the hand-off comes after every check and collection', () => {
     const all = steps(CI);
-    const firstUpload = all.findIndex((s) => s.uses?.startsWith('actions/upload-artifact@'));
-    assert.equal(firstUpload, all.length - 2);
+    const firstHandoff = indexOf(CI, 'Stage dashboard snapshot');
+    assert.equal(firstHandoff, all.length - 4);
     for (const name of [
       'Typecheck',
       'Lint',
@@ -213,10 +277,10 @@ describe('workflows: CI artifact hand-off (ci.yml)', () => {
       'Playwright tests',
       ARTIFACTS.suites.producerStep,
     ]) {
-      assert.ok(indexOf(CI, name) >= 0 && indexOf(CI, name) < firstUpload, name);
+      assert.ok(indexOf(CI, name) >= 0 && indexOf(CI, name) < firstHandoff, name);
     }
-    // Every step from the first upload on runs regardless of earlier failures.
-    for (const s of all.slice(firstUpload)) assert.ok(s.if?.startsWith('always() && '), s.name);
+    // Every hand-off step runs regardless of earlier failures, including a failed upload.
+    for (const s of all.slice(firstHandoff)) assert.ok(s.if?.startsWith('always() && '), s.name);
   });
 
   test('pull request runs never upload: every upload condition requires push or dispatch on main', () => {
@@ -226,11 +290,11 @@ describe('workflows: CI artifact hand-off (ci.yml)', () => {
     }
   });
 
-  test('raw reports are never uploaded', () => {
+  test('test reports are never uploaded; only the two staged hand-off files', () => {
     const paths = steps(CI).flatMap((s) => (s.with['path'] === undefined ? [] : [s.with['path']]));
     assert.deepEqual(paths, [
-      'artifacts/dashboard/dashboard-data.json',
-      'artifacts/ci/suite-results.json',
+      'artifacts/handoff/ci-snapshot-attempt-${{ github.run_attempt }}.json',
+      'artifacts/handoff/ci-suite-results-attempt-${{ github.run_attempt }}.json',
     ]);
     assert.doesNotMatch(code(CI), /\.tap\b[^\n]*\n[^\n]*upload|playwright-report|test-results/);
   });
@@ -322,10 +386,27 @@ describe('workflows: CI history dry run (ci-history.yml)', () => {
         'github-token': '${{ github.token }}',
         path: `\${{ runner.temp }}/ci-history/download/${kind}`,
         'digest-mismatch': 'error',
+        'skip-decompress': 'true',
       });
       assert.ok(s.if?.startsWith(`steps.resolve.outputs.${output} != ''`), name);
     }
     assert.equal(c.match(/download-artifact@/g)?.length, 2);
+  });
+
+  test('no archive is ever extracted: every upload is raw and every download skips decompression', () => {
+    const uploads = steps(CI).filter((s) => s.uses?.startsWith('actions/upload-artifact@'));
+    assert.equal(uploads.length, 2);
+    for (const s of uploads) assert.equal(s.with['archive'], 'false', s.name);
+    const downloads = steps(HISTORY).filter((s) =>
+      s.uses?.startsWith('actions/download-artifact@'),
+    );
+    assert.equal(downloads.length, 2);
+    for (const s of downloads) {
+      assert.equal(s.with['skip-decompress'], 'true', s.name);
+      assert.equal(s.with['artifact-ids']?.startsWith('${{ steps.resolve.outputs.'), true);
+      assert.equal(s.with['name'], undefined, `${s.name}: never by name`);
+      assert.equal(s.with['pattern'], undefined, `${s.name}: never by pattern`);
+    }
   });
 
   test('later stages run only when the snapshot exists', () => {

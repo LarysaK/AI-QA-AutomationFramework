@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -19,9 +20,15 @@ import { parseInstant } from './history';
  *   - it has not expired, has a sha256 digest and is within the size limit, and
  *   - the job's upload step for it succeeded.
  *
- * The artifact is then downloaded by its ID only; the download action verifies the archive
- * against the digest the API reports. That digest is transport integrity (the bytes are the
- * bytes the run uploaded), not authentication and not proof that test results are true.
+ * Raw hand-off (M3d-1): each artifact is one JSON file uploaded without an archive
+ * (upload-artifact `archive: false`), so the artifact's name is the file name
+ * (`ci-snapshot-attempt-<n>.json`) and the API's `size_in_bytes` and `digest` are the size and
+ * SHA-256 of the file itself. It is downloaded by its ID only, with `skip-decompress: true`: the
+ * download action never extracts anything and writes the bytes to one file. readArtifactFile then
+ * checks, before anything is parsed, that the folder holds exactly that one regular file, that
+ * its size equals the listed size (within the limit), that it is not a ZIP archive, and that its
+ * SHA-256 equals the listed digest. The digest is transport integrity (the bytes are the bytes
+ * the run uploaded), not authentication and not proof that test results are true.
  *
  * An absent artifact is "never produced" only when the job itself says so: its upload step was
  * skipped, and for the snapshot the API also shows that the step generating it failed, was
@@ -30,30 +37,22 @@ import { parseInstant } from './history';
  * refuses a successful run without them, so no counts or success are ever inferred. Any other
  * absence, a duplicate or a contradiction is an error.
  *
- * Known limitation (ZIP extraction), a mandatory security review item before M3d introduces any
- * write-capable publishing workflow: the pinned actions/download-artifact (v8.0.2, using
- * @actions/artifact 6.3.1 and unzip-stream) extracts the archive while streaming it and compares
- * the ZIP digest only after extraction has finished; a mismatch fails the step, but the files
- * are already on disk. The archive-size limit (`size_in_bytes`, checked before download) bounds
- * the compressed size only: it does not prevent a decompression bomb, and the extracted file's
- * size is checked (readArtifactFile) only after extraction. The action itself neutralizes `..`
- * path components and creates no symbolic links. In this read-only dry run the impact is limited
- * to the job's disk and its 15-minute timeout.
+ * No archive is extracted anywhere in this hand-off, so there is no decompression to bound.
  */
 
 export type ArtifactKind = 'snapshot' | 'suites';
 export const ARTIFACT_KINDS: readonly ArtifactKind[] = ['snapshot', 'suites'];
 
 export interface ArtifactSpec {
-  /** Name prefix; the run attempt follows. */
+  /** Name prefix; the run attempt and `.json` follow. */
   readonly prefix: string;
-  /** The single file inside the artifact. */
+  /** The CI file that is uploaded, as a raw artifact, under the attempt-specific name. */
   readonly file: string;
   /** The CI job step that uploads it (.github/workflows/ci.yml). */
   readonly uploadStep: string;
   /** The step that produces the file; for the snapshot, its conclusion decides "never produced". */
   readonly producerStep: string;
-  /** Largest accepted archive and extracted file. */
+  /** Largest accepted artifact (the raw file). */
   readonly maxBytes: number;
 }
 
@@ -81,7 +80,13 @@ export const ARTIFACT_CLOCK_TOLERANCE_MS = 120_000;
 const VERIFY_JOB = 'Verify';
 
 export const artifactName = (kind: ArtifactKind, attempt: number): string =>
-  `${ARTIFACTS[kind].prefix}${String(attempt)}`;
+  `${ARTIFACTS[kind].prefix}${String(attempt)}.json`;
+
+/**
+ * The name download-artifact gives a raw download when the blob response names no file
+ * (`skip-decompress: true` uses the Content-Disposition file name, else this fallback).
+ */
+export const DOWNLOAD_FALLBACK_NAME = 'artifact';
 
 export class HandoffError extends Error {
   readonly problems: readonly string[];
@@ -335,13 +340,27 @@ function artifactsNamed(listing: unknown, name: string, problems: string[]): unk
   return artifacts as unknown[];
 }
 
+/** Local file headers, empty archives and spanned archives all start with "PK". */
+const ZIP_SIGNATURES = [
+  [0x50, 0x4b, 0x03, 0x04],
+  [0x50, 0x4b, 0x05, 0x06],
+  [0x50, 0x4b, 0x07, 0x08],
+];
+
 /**
- * The one expected file of a downloaded artifact folder. The folder must contain exactly that
- * regular file (no links, no other entries) within the size limit.
+ * The raw file of a downloaded artifact, verified against its listing before it is parsed. The
+ * folder (created for this one artifact ID) must hold exactly one regular file, named after the
+ * artifact or download-artifact's fallback name; its size must equal the listed size and stay
+ * within the limit; it must not be a ZIP archive (nothing is ever extracted); and its SHA-256
+ * must equal the listed digest. Only then is it decoded, as strict UTF-8.
  */
-export function readArtifactFile(dir: string, kind: ArtifactKind): string {
+export function readArtifactFile(
+  dir: string,
+  kind: ArtifactKind,
+  artifact: Extract<ArtifactDecision, { state: 'download' }>,
+): string {
   const spec = ARTIFACTS[kind];
-  const where = `${spec.prefix}<attempt>`;
+  const where = artifact.name;
   let entries: string[];
   try {
     if (!lstatSync(dir).isDirectory()) throw new Error('not a directory');
@@ -349,24 +368,41 @@ export function readArtifactFile(dir: string, kind: ArtifactKind): string {
   } catch {
     throw new HandoffError([`${where}: the downloaded folder is missing`]);
   }
-  if (entries.length !== 1 || entries[0] !== spec.file) {
+  const allowed = [artifact.name, DOWNLOAD_FALLBACK_NAME];
+  if (entries.length !== 1 || !allowed.includes(entries[0] ?? '')) {
     throw new HandoffError([
-      `${where}: expected exactly one file "${spec.file}", found ${String(entries.length)} entries`,
+      `${where}: expected exactly one file named "${artifact.name}" or "${DOWNLOAD_FALLBACK_NAME}", found ${String(entries.length)} entries`,
     ]);
   }
-  const path = join(dir, spec.file);
+  const path = join(dir, entries[0] ?? '');
   const stat = lstatSync(path);
-  if (!stat.isFile()) throw new HandoffError([`${where}: ${spec.file} is not a regular file`]);
+  if (!stat.isFile()) throw new HandoffError([`${where}: the download is not a regular file`]);
   if (stat.size > spec.maxBytes) {
     throw new HandoffError([
-      `${where}: ${spec.file} is larger than ${String(spec.maxBytes)} bytes`,
+      `${where}: the download is larger than ${String(spec.maxBytes)} bytes`,
+    ]);
+  }
+  if (stat.size !== artifact.sizeInBytes) {
+    throw new HandoffError([
+      `${where}: the download is ${String(stat.size)} bytes, the artifact ${String(artifact.sizeInBytes)}`,
     ]);
   }
   const bytes = readFileSync(path);
+  if (bytes.length !== artifact.sizeInBytes) {
+    throw new HandoffError([`${where}: the download changed while it was read`]);
+  }
+  if (ZIP_SIGNATURES.some((signature) => signature.every((byte, i) => bytes[i] === byte))) {
+    throw new HandoffError([
+      `${where}: the download is a ZIP archive; archives are never extracted`,
+    ]);
+  }
+  if (`sha256:${createHash('sha256').update(bytes).digest('hex')}` !== artifact.digest) {
+    throw new HandoffError([`${where}: SHA-256 does not match the artifact digest`]);
+  }
   try {
     return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
-    throw new HandoffError([`${where}: ${spec.file} is not valid UTF-8`]);
+    throw new HandoffError([`${where}: the download is not valid UTF-8`]);
   }
 }
 

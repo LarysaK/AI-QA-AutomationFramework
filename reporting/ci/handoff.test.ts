@@ -29,8 +29,10 @@ import {
   ARTIFACTS,
   type ApiInputs,
   apiRequests,
+  type ArtifactDecision,
   artifactName,
   type ArtifactKind,
+  DOWNLOAD_FALLBACK_NAME,
   fetchApiInputs,
   HandoffError,
   MAX_API_RESPONSE_BYTES,
@@ -179,8 +181,8 @@ function refused(fn: () => unknown, reason: RegExp): void {
 
 describe('hand-off: artifact names', () => {
   test('are bound to the run attempt', () => {
-    assert.equal(artifactName('snapshot', 1), 'ci-snapshot-attempt-1');
-    assert.equal(artifactName('suites', 3), 'ci-suite-results-attempt-3');
+    assert.equal(artifactName('snapshot', 1), 'ci-snapshot-attempt-1.json');
+    assert.equal(artifactName('suites', 3), 'ci-suite-results-attempt-3.json');
   });
 
   test('API requests are attempt-scoped and ask for the exact names', () => {
@@ -188,8 +190,8 @@ describe('hand-off: artifact names', () => {
     assert.deepEqual(apiRequests({ ...RUN_2_CONTEXT, runAttempt: 2 }), {
       run: `${base}/attempts/2`,
       jobs: `${base}/attempts/2/jobs?per_page=100`,
-      snapshot: `${base}/artifacts?name=ci-snapshot-attempt-2&per_page=100`,
-      suites: `${base}/artifacts?name=ci-suite-results-attempt-2&per_page=100`,
+      snapshot: `${base}/artifacts?name=ci-snapshot-attempt-2.json&per_page=100`,
+      suites: `${base}/artifacts?name=ci-suite-results-attempt-2.json&per_page=100`,
     });
   });
 });
@@ -206,14 +208,14 @@ describe('hand-off: resolving the triggering attempt (synthetic API data)', () =
       recordable: true,
       snapshot: {
         state: 'download',
-        name: 'ci-snapshot-attempt-1',
+        name: 'ci-snapshot-attempt-1.json',
         id: 5001,
         sizeInBytes: 4096,
         digest: `sha256:${'a'.repeat(64)}`,
       },
       suites: {
         state: 'download',
-        name: 'ci-suite-results-attempt-1',
+        name: 'ci-suite-results-attempt-1.json',
         id: 5002,
         sizeInBytes: 4096,
         digest: `sha256:${'b'.repeat(64)}`,
@@ -234,7 +236,7 @@ describe('hand-off: resolving the triggering attempt (synthetic API data)', () =
     assert.equal(resolution.recordable, false);
     assert.deepEqual(resolution.snapshot, {
       state: 'not-produced',
-      name: 'ci-snapshot-attempt-1',
+      name: 'ci-snapshot-attempt-1.json',
       reason:
         'the CI job did not generate the snapshot (step "Generate dashboard snapshot": failure); a run record needs the snapshot, so none is composed',
     });
@@ -260,7 +262,7 @@ describe('hand-off: resolving the triggering attempt (synthetic API data)', () =
     inputs.listings.snapshot = listing();
     refused(
       () => resolveHandoff(RUN_2_CONTEXT, inputs),
-      /ci-snapshot-attempt-1: step "Generate dashboard snapshot" succeeded but the upload was skipped; refusing to treat the snapshot as never produced/,
+      /ci-snapshot-attempt-1\.json: step "Generate dashboard snapshot" succeeded but the upload was skipped; refusing to treat the snapshot as never produced/,
     );
   });
 
@@ -269,7 +271,7 @@ describe('hand-off: resolving the triggering attempt (synthetic API data)', () =
     inputs.listings.snapshot = listing();
     refused(
       () => resolveHandoff(RUN_2_CONTEXT, inputs),
-      /ci-snapshot-attempt-1: the upload step succeeded but the artifact is missing/,
+      /ci-snapshot-attempt-1\.json: the upload step succeeded but the artifact is missing/,
     );
   });
 
@@ -322,12 +324,12 @@ describe('hand-off: resolving the triggering attempt (synthetic API data)', () =
     [
       'a missing snapshot although its upload succeeded',
       (i) => (i.listings.snapshot = listing()),
-      /ci-snapshot-attempt-1: the upload step succeeded but the artifact is missing/,
+      /ci-snapshot-attempt-1\.json: the upload step succeeded but the artifact is missing/,
     ],
     [
       'missing suite results although their upload succeeded',
       (i) => (i.listings.suites = listing()),
-      /ci-suite-results-attempt-1: the upload step succeeded but the artifact is missing/,
+      /ci-suite-results-attempt-1\.json: the upload step succeeded but the artifact is missing/,
     ],
     [
       'an artifact although its upload was skipped',
@@ -369,7 +371,9 @@ describe('hand-off: resolving the triggering attempt (synthetic API data)', () =
     [
       "another attempt's artifact in the listing",
       (i) =>
-        (i.listings.snapshot = listing(artifact('snapshot', { name: 'ci-snapshot-attempt-2' }))),
+        (i.listings.snapshot = listing(
+          artifact('snapshot', { name: 'ci-snapshot-attempt-2.json' }),
+        )),
       /the listing contains artifacts with other names/,
     ],
     [
@@ -570,7 +574,7 @@ describe('hand-off: resolving the triggering attempt (synthetic API data)', () =
     assert.ok(resolution.snapshot.state === 'download' && resolution.snapshot.id === 6001);
     assert.ok(
       resolution.suites.state === 'download' &&
-        resolution.suites.name === 'ci-suite-results-attempt-2',
+        resolution.suites.name === 'ci-suite-results-attempt-2.json',
     );
     // Attempt 1's artifacts under attempt 2 would be refused: wrong name.
     inputs.listings.snapshot = listing(artifact('snapshot'));
@@ -580,54 +584,147 @@ describe('hand-off: resolving the triggering attempt (synthetic API data)', () =
 
 // ---------------------------------------------------------------- downloaded folders
 
-describe('hand-off: downloaded artifact folders', () => {
+describe('hand-off: raw downloaded artifacts (verified before parsing)', () => {
+  const sha = (bytes: string | Buffer): string =>
+    `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+  /** The listing entry the resolver decided to download, matching `bytes` unless changed. */
+  const decision = (
+    kind: ArtifactKind,
+    bytes: string | Buffer,
+    change: { sizeInBytes?: number; digest?: string } = {},
+  ): Extract<ArtifactDecision, { state: 'download' }> => ({
+    state: 'download',
+    name: artifactName(kind, 1),
+    id: kind === 'snapshot' ? 5001 : 5002,
+    sizeInBytes: Buffer.byteLength(bytes),
+    digest: sha(bytes),
+    ...change,
+  });
   const folder = (files: Record<string, string | Buffer>): string => {
     const dir = temporary('ci-handoff-folder-');
     for (const [name, content] of Object.entries(files)) writeFileSync(join(dir, name), content);
     return dir;
   };
+  const SUITES_JSON = '{"kind":"suite-results"}\n';
 
-  test('exactly the expected file is read', () => {
-    assert.equal(readArtifactFile(folder({ 'suite-results.json': '{}' }), 'suites'), '{}');
+  test('a raw JSON file named after the artifact is read once its size and digest match', () => {
+    const dir = folder({ 'ci-suite-results-attempt-1.json': SUITES_JSON });
+    assert.equal(readArtifactFile(dir, 'suites', decision('suites', SUITES_JSON)), SUITES_JSON);
   });
 
-  test('refuses a missing folder, extra or wrong files, links, oversized or non-UTF-8 files', () => {
+  test("download-artifact's fallback file name is accepted, any other name is not", () => {
+    assert.equal(DOWNLOAD_FALLBACK_NAME, 'artifact');
+    const fallback = folder({ artifact: SUITES_JSON });
+    assert.equal(
+      readArtifactFile(fallback, 'suites', decision('suites', SUITES_JSON)),
+      SUITES_JSON,
+    );
+    for (const name of ['suite-results.json', 'ci-suite-results-attempt-2.json', 'artifact.zip']) {
+      refused(
+        () =>
+          readArtifactFile(
+            folder({ [name]: SUITES_JSON }),
+            'suites',
+            decision('suites', SUITES_JSON),
+          ),
+        /expected exactly one file named "ci-suite-results-attempt-1\.json" or "artifact", found 1 entries/,
+      );
+    }
+  });
+
+  test('a SHA-256 mismatch is refused before parsing', () => {
+    const dir = folder({ 'ci-suite-results-attempt-1.json': SUITES_JSON });
+    const other = SUITES_JSON.replace('suite', 'SUITE');
     refused(
-      () => readArtifactFile(join(tmpdir(), 'ci-handoff-does-not-exist'), 'snapshot'),
-      /ci-snapshot-attempt-<attempt>: the downloaded folder is missing/,
+      () =>
+        readArtifactFile(dir, 'suites', decision('suites', SUITES_JSON, { digest: sha(other) })),
+      /ci-suite-results-attempt-1\.json: SHA-256 does not match the artifact digest/,
+    );
+  });
+
+  test('a size mismatch is refused, in either direction', () => {
+    const dir = folder({ 'ci-suite-results-attempt-1.json': SUITES_JSON });
+    for (const sizeInBytes of [SUITES_JSON.length - 1, SUITES_JSON.length + 1]) {
+      refused(
+        () => readArtifactFile(dir, 'suites', decision('suites', SUITES_JSON, { sizeInBytes })),
+        new RegExp(
+          `the download is ${String(SUITES_JSON.length)} bytes, the artifact ${String(sizeInBytes)}`,
+        ),
+      );
+    }
+  });
+
+  test('an oversized file is refused before it is read', () => {
+    const big = Buffer.alloc(ARTIFACTS.suites.maxBytes + 1, 0x20);
+    const dir = folder({ 'ci-suite-results-attempt-1.json': big });
+    refused(
+      () => readArtifactFile(dir, 'suites', decision('suites', big)),
+      /the download is larger than 4194304 bytes/,
+    );
+  });
+
+  test('ZIP content is refused without extraction, even when size and digest match', () => {
+    const zips = [
+      Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), Buffer.alloc(60, 0)]), // local file header
+      Buffer.concat([Buffer.from([0x50, 0x4b, 0x05, 0x06]), Buffer.alloc(18, 0)]), // empty archive
+      Buffer.concat([Buffer.from([0x50, 0x4b, 0x07, 0x08]), Buffer.alloc(12, 0)]), // spanned archive
+    ];
+    for (const zip of zips) {
+      const dir = folder({ 'ci-snapshot-attempt-1.json': zip });
+      refused(
+        () => readArtifactFile(dir, 'snapshot', decision('snapshot', zip)),
+        /ci-snapshot-attempt-1\.json: the download is a ZIP archive; archives are never extracted/,
+      );
+      assert.deepEqual(readdirSync(dir), ['ci-snapshot-attempt-1.json'], 'nothing was extracted');
+    }
+  });
+
+  test('refuses a missing folder, several files, a folder, a link or non-UTF-8 bytes', () => {
+    refused(
+      () =>
+        readArtifactFile(
+          join(tmpdir(), 'ci-handoff-does-not-exist'),
+          'snapshot',
+          decision('snapshot', '{}'),
+        ),
+      /ci-snapshot-attempt-1\.json: the downloaded folder is missing/,
     );
     refused(
-      () => readArtifactFile(folder({ 'suite-results.json': '{}', 'extra.sh': 'x' }), 'suites'),
-      /expected exactly one file "suite-results.json", found 2 entries/,
+      () =>
+        readArtifactFile(
+          folder({ 'ci-suite-results-attempt-1.json': SUITES_JSON, artifact: SUITES_JSON }),
+          'suites',
+          decision('suites', SUITES_JSON),
+        ),
+      /found 2 entries/,
     );
     refused(
-      () => readArtifactFile(folder({ 'results.json': '{}' }), 'suites'),
-      /expected exactly one file/,
+      () => readArtifactFile(folder({}), 'suites', decision('suites', SUITES_JSON)),
+      /found 0 entries/,
     );
     const nested = temporary('ci-handoff-nested-');
-    mkdirSync(join(nested, 'suite-results.json'));
-    refused(() => readArtifactFile(nested, 'suites'), /is not a regular file/);
+    mkdirSync(join(nested, 'ci-suite-results-attempt-1.json'));
+    refused(
+      () => readArtifactFile(nested, 'suites', decision('suites', SUITES_JSON)),
+      /the download is not a regular file/,
+    );
     const linked = temporary('ci-handoff-link-');
-    symlinkSync(
-      join(FIXTURES, 'snapshot/dashboard-data.json'),
-      join(linked, 'dashboard-data.json'),
+    const target = join(temporary('ci-handoff-link-target-'), 'x.json');
+    writeFileSync(target, SUITES_JSON);
+    symlinkSync(target, join(linked, 'ci-suite-results-attempt-1.json'));
+    refused(
+      () => readArtifactFile(linked, 'suites', decision('suites', SUITES_JSON)),
+      /the download is not a regular file/,
     );
-    refused(() => readArtifactFile(linked, 'snapshot'), /is not a regular file/);
+    const invalid = Buffer.from([0x7b, 0xff, 0x7d]);
     refused(
       () =>
         readArtifactFile(
-          folder({ 'suite-results.json': Buffer.alloc(ARTIFACTS.suites.maxBytes + 1, 0x20) }),
+          folder({ 'ci-suite-results-attempt-1.json': invalid }),
           'suites',
+          decision('suites', invalid),
         ),
-      /larger than 4194304 bytes/,
-    );
-    refused(
-      () =>
-        readArtifactFile(
-          folder({ 'suite-results.json': Buffer.from([0x7b, 0xff, 0x7d]) }),
-          'suites',
-        ),
-      /not valid UTF-8/,
+      /the download is not valid UTF-8/,
     );
   });
 });
@@ -730,20 +827,32 @@ const API_FILES: Record<string, (i: ApiInputs) => unknown> = {
   'artifacts-suites.json': (i) => i.listings.suites,
 };
 
-/** A work folder as the workflow leaves it before `compose`, plus offline API responses. */
+/**
+ * A work folder as the workflow leaves it before `compose`, plus offline API responses. Each
+ * listed artifact gets the size and SHA-256 of its download, as upload-artifact records them for
+ * a raw file; `onDisk` writes different bytes after listing (tampering in transit).
+ */
 function workFolder(
   inputs: ApiInputs,
   downloads: { snapshot?: string; suites?: string },
+  onDisk: { snapshot?: string; suites?: string } = {},
 ): { work: string; apiDir: string } {
   const work = temporary('ci-handoff-work-');
   const apiDir = temporary('ci-handoff-api-');
   writeFileSync(join(work, 'context.json'), canonicalJson(RUN_2_CONTEXT));
-  for (const [file, pick] of Object.entries(API_FILES))
-    writeFileSync(join(apiDir, file), JSON.stringify(pick(inputs)));
+  const listed = structuredClone<ApiInputs>(inputs);
   for (const [kind, content] of Object.entries(downloads) as [ArtifactKind, string][]) {
+    const artifacts = (listed.listings[kind] as { artifacts?: Record<string, unknown>[] })
+      .artifacts;
+    if (artifacts?.length === 1 && artifacts[0] !== undefined) {
+      artifacts[0]['size_in_bytes'] = Buffer.byteLength(content);
+      artifacts[0]['digest'] = `sha256:${createHash('sha256').update(content).digest('hex')}`;
+    }
     mkdirSync(join(work, 'download', kind), { recursive: true });
-    writeFileSync(join(work, 'download', kind, ARTIFACTS[kind].file), content);
+    writeFileSync(join(work, 'download', kind, artifactName(kind, 1)), onDisk[kind] ?? content);
   }
+  for (const [file, pick] of Object.entries(API_FILES))
+    writeFileSync(join(apiDir, file), JSON.stringify(pick(listed)));
   return { work, apiDir };
 }
 
@@ -879,6 +988,44 @@ describe('hand-off: resolve and compose (offline, synthetic API data)', () => {
     });
   }
 
+  const transport: [string, { snapshot?: string; suites?: string }, RegExp][] = [
+    [
+      'a snapshot changed after it was listed (digest)',
+      { snapshot: SNAPSHOT.replace('"schemaVersion"', '"schemaVersion" ') },
+      /ci-snapshot-attempt-1\.json: the download is \d+ bytes, the artifact \d+/,
+    ],
+    [
+      'suite results changed after they were listed (same size)',
+      { suites: SUITES.replace('suite-results', 'suite-resultz') },
+      /ci-suite-results-attempt-1\.json: SHA-256 does not match the artifact digest/,
+    ],
+  ];
+  for (const [name, onDisk, reason] of transport) {
+    test(`refuses ${name}, before anything is parsed`, async () => {
+      const { work, apiDir } = workFolder(api(), { snapshot: SNAPSHOT, suites: SUITES }, onDisk);
+      await resolveStage(work, { api: apiDir });
+      refused(() => composeStage(work), reason);
+      assert.ok(!readdirSync(work).includes('record.json'));
+    });
+  }
+
+  test('refuses a ZIP delivered as the snapshot, without extracting it', async () => {
+    const zip = Buffer.concat([
+      Buffer.from('PK\u0003\u0004', 'latin1'),
+      Buffer.alloc(40, 0),
+    ]).toString('latin1');
+    const { work, apiDir } = workFolder(api(), { snapshot: zip, suites: SUITES });
+    await resolveStage(work, { api: apiDir });
+    refused(
+      () => composeStage(work),
+      /the download is a ZIP archive; archives are never extracted/,
+    );
+    assert.deepEqual(readdirSync(join(work, 'download', 'snapshot')), [
+      'ci-snapshot-attempt-1.json',
+    ]);
+    assert.ok(!readdirSync(work).includes('record.json'));
+  });
+
   test('the resolve CLI writes integer step outputs only', () => {
     const { work, apiDir } = workFolder(api(), {});
     const outputs = join(work, 'outputs.txt');
@@ -943,7 +1090,7 @@ describe('hand-off: job summary', () => {
     );
     assert.match(
       summary,
-      /snapshot: downloaded \(digest checked by the download action\); suite results: downloaded/,
+      /snapshot: downloaded raw \(size and SHA-256 verified, nothing extracted\); suite results: downloaded raw/,
     );
     assert.match(summary, /\| Run record \| composed \(job conclusion: success\) \|/);
     assert.match(summary, new RegExp(`add v1/runs/39144953322-1\\.json, sha256 ${sha256(text)}`));
