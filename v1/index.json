@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "ci-history-index",
+  "recordSchema": "ci-run/1.0",
+  "runs": [
+    {
+      "runId": 39843212300,
+      "attempt": 1,
+      "number": 15,
+      "commitSha": "55b9e7a1bceec6570f8ab39b1dc05395b2974cb2",
+      "event": "push",
+      "conclusion": "success",
+      "jobCompletedAt": "2026-10-22T19:53:30Z",
+      "path": "v1/runs/39843212300-1.json",
+      "sha256": "1aa232773de46b01d2d32d0e02b5f0daa5d9b51e7f7157d79d6dc2106950a076"
+    }
+  ]
+}
