@@ -30,6 +30,12 @@ export const MAX_RECORD_BYTES = 1024 * 1024;
 export const MAX_INDEX_BYTES = 16 * 1024 * 1024;
 /** Largest accepted README (64 KiB). */
 export const MAX_README_BYTES = 64 * 1024;
+/**
+ * Largest record handed from the read-only compose job to the publish job (64 KiB). It travels
+ * base64-encoded in one environment variable, which Linux limits to 128 KiB; larger records fail
+ * closed instead of being truncated. A record today is about 9 KB.
+ */
+export const MAX_PAYLOAD_BYTES = 64 * 1024;
 
 export const INDEX_PATH = 'v1/index.json';
 export const README_PATH = 'README.md';

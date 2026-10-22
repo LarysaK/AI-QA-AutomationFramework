@@ -23,7 +23,7 @@
 // {"check":"passed","action":"add"|"unchanged","path","sha256"}; exit 0 on success, 1 otherwise.
 
 import console from 'node:console';
-import { lstatSync, readFileSync } from 'node:fs';
+import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -178,7 +178,12 @@ function option(args, name) {
   return value;
 }
 
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// The entry point, compared by real path: a symlinked or aliased path must not skip the check
+// (which would exit 0 having checked nothing).
+if (
+  process.argv[1] !== undefined &&
+  realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))
+) {
   try {
     const args = process.argv.slice(2);
     const eventText = readBounded(resolve(option(args, 'event')), MAX_EVENT_BYTES, 'the event');
