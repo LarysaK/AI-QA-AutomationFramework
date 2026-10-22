@@ -11,6 +11,7 @@ import { dirname, join, resolve } from 'node:path';
 import { defaultSafetyContext } from '../dashboard-data/sanitize';
 import { CollectError, composeRecord, serializeRecord, snapshotReference } from './collect';
 import { ContextError, contextToEnvironment, parseRunContext, type RunContext } from './context';
+import { canonicalJson, MAX_PAYLOAD_BYTES, MAX_RECORD_BYTES, recordPath, sha256 } from './history';
 import {
   ARTIFACTS,
   type ApiInputs,
@@ -25,26 +26,31 @@ import {
 } from './handoff';
 
 /**
- * The read-only steps of the CI history dry run (.github/workflows/ci-history.yml). All files
- * live in one work folder:
+ * The read-only compose steps of the CI history workflow (.github/workflows/ci-history.yml). All
+ * files live in one work folder:
  *
  *   context.json            ci:collect context, from the trusted workflow_run event
  *   api/*.json              Actions API responses for the triggering run attempt
  *   resolution.json         which artifacts to download, and which were never produced
  *   download/<kind>/        the raw downloaded artifacts (by ID, never extracted)
  *   record.json             the composed run record
- *   plan.json, check.json   history-cli plan and publish-check results
+ *   plan.json, check.json   history-cli plan and publish-check, against the current ci-history
  *
  *   npx tsx reporting/ci/handoff-cli.ts resolve --work <dir> [--api <dir>]
  *   npx tsx reporting/ci/handoff-cli.ts compose --work <dir>
+ *   npx tsx reporting/ci/handoff-cli.ts payload --work <dir>
  *   npx tsx reporting/ci/handoff-cli.ts summary --work <dir>
  *
  * `resolve` fetches the API responses (GITHUB_TOKEN; or, offline, copies them from --api),
  * decides, and writes the step outputs `recordable`, `run-id`, `snapshot-id` and `suites-id`
  * (integers or empty) to GITHUB_OUTPUT. `compose` re-derives that decision from the saved
  * responses, reads the downloaded files and composes the record with the collector's checks.
- * `summary` prints a Markdown job summary of fixed text, integers and validated values only.
- * Nothing here writes outside the work folder, and nothing is published. Exit 0 on success.
+ * `payload` hands the record to the separate, approved publish job: it writes the step outputs
+ * `publish` (true only when the plan adds a new record), `record-sha256` and `record-b64`, after
+ * checking that the record is canonical, matches the plan's SHA-256 and path, and fits
+ * MAX_PAYLOAD_BYTES. `summary` prints a Markdown job summary of fixed text, integers and
+ * validated values only. Nothing here writes outside the work folder, and nothing here
+ * publishes. Exit 0 on success.
  */
 
 const repoRoot = resolve(__dirname, '..', '..');
@@ -196,6 +202,57 @@ const recordPathText = (value: unknown): string =>
     ? value
     : '?';
 
+/**
+ * The publication hand-off for the approved publish job, as GITHUB_OUTPUT lines: `publish`
+ * (true only when the plan adds a new record), `record-sha256` and `record-b64` (empty when there
+ * is nothing to publish). The record must be exactly its canonical bytes, its SHA-256 and path
+ * must be the plan's, and it must fit MAX_PAYLOAD_BYTES; anything else fails closed.
+ */
+export function payloadStage(work: string): string {
+  const recordFile = join(work, 'record.json');
+  let text: string;
+  try {
+    const stat = lstatSync(recordFile);
+    if (!stat.isFile() || stat.size > MAX_RECORD_BYTES) throw new Error('size');
+    text = new TextDecoder('utf-8', { fatal: true }).decode(readFileSync(recordFile));
+  } catch {
+    throw new HandoffError(['record.json is missing, not a regular file, too large or not UTF-8']);
+  }
+  let record: unknown;
+  try {
+    record = JSON.parse(text);
+  } catch {
+    throw new HandoffError(['record.json is not JSON']);
+  }
+  const plan = readJson(join(work, 'plan.json'), 64 * 1024);
+  const digest = sha256(text);
+  const problems: string[] = [];
+  if (canonicalJson(record) !== text) problems.push('record.json is not in canonical form');
+  if (at(plan, 'sha256') !== digest) problems.push('the plan SHA-256 differs from record.json');
+  const runId = at(record, 'run', 'id');
+  const attempt = at(record, 'run', 'attempt');
+  if (
+    typeof runId !== 'number' ||
+    typeof attempt !== 'number' ||
+    at(plan, 'path') !== recordPath(runId, attempt)
+  ) {
+    problems.push('the plan path is not the record path of this run attempt');
+  }
+  const action = at(plan, 'action');
+  if (action !== 'add' && action !== 'unchanged') problems.push('the plan action is unknown');
+  const publish = action === 'add';
+  if (publish && Buffer.byteLength(text, 'utf8') > MAX_PAYLOAD_BYTES) {
+    problems.push(`the record is larger than the ${String(MAX_PAYLOAD_BYTES)}-byte hand-off limit`);
+  }
+  if (problems.length > 0) throw new HandoffError(problems);
+  return [
+    `publish=${String(publish)}`,
+    `record-sha256=${digest}`,
+    `record-b64=${publish ? Buffer.from(text, 'utf8').toString('base64') : ''}`,
+    '',
+  ].join('\n');
+}
+
 /** The job summary: fixed text plus values re-validated here, never free text from inputs. */
 export function summaryStage(work: string): string {
   const context = optionalJson(join(work, 'context.json'));
@@ -218,9 +275,9 @@ export function summaryStage(work: string): string {
   };
   const recordable = at(resolution, 'recordable');
   const lines = [
-    '## CI history: DRY RUN',
+    '## CI history: compose (read-only)',
     '',
-    'Nothing was published. This workflow has read-only permissions, writes no history, branch or ref, and its files are discarded when the job ends.',
+    'This job has read-only permissions and writes nothing. A new record is published only by the separate publish job, after approval of the ci-history environment.',
     '',
     '| Stage | Result |',
     '| --- | --- |',
@@ -241,7 +298,7 @@ export function summaryStage(work: string): string {
           ? notRun
           : `composed (job conclusion: ${oneOf(at(record, 'conclusion'), ['success', 'failure', 'cancelled', 'timed_out'])})`
     } |`,
-    `| History plan (empty history) | ${
+    `| History plan (current ci-history) | ${
       recordable === false
         ? '—'
         : plan === undefined
@@ -294,10 +351,15 @@ async function main(): Promise<void> {
   } else if (mode === 'compose') {
     composeStage(work);
     process.stdout.write('record composed\n');
+  } else if (mode === 'payload') {
+    const outputs = payloadStage(work);
+    const file = process.env['GITHUB_OUTPUT'];
+    if (file !== undefined && file !== '') appendFileSync(file, outputs);
+    process.stdout.write(outputs.replace(/^record-b64=.+$/m, 'record-b64=<base64>'));
   } else if (mode === 'summary') {
     process.stdout.write(summaryStage(work));
   } else {
-    throw new HandoffError(['usage: handoff-cli.ts resolve|compose|summary --work <dir>']);
+    throw new HandoffError(['usage: handoff-cli.ts resolve|compose|payload|summary --work <dir>']);
   }
 }
 
@@ -314,7 +376,7 @@ if (require.main === module) {
     } else {
       // No message or stack: either could carry runner paths.
       console.error(
-        `CI history dry run failed: unexpected ${error instanceof Error ? error.name : 'error'}`,
+        `CI history compose failed: unexpected ${error instanceof Error ? error.name : 'error'}`,
       );
     }
     process.exit(1);

@@ -9,7 +9,7 @@
 // Diagnostic only: always exits 0 (an unreadable payload is reported as such), and the
 // validation that gates the workflow is ci:collect context.
 
-import { lstatSync, readFileSync } from 'node:fs';
+import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import process from 'node:process';
 import { resolve } from 'node:path';
 
@@ -104,7 +104,11 @@ export function describeEventShape(event) {
   return `${lines.join('\n')}\n`;
 }
 
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) {
+// The entry point, compared by real path (a symlinked path must not skip the program).
+if (
+  process.argv[1] !== undefined &&
+  realpathSync(resolve(process.argv[1])) === realpathSync(import.meta.filename)
+) {
   const path = process.argv[2];
   let event;
   try {

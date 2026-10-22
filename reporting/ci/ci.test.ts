@@ -29,6 +29,7 @@ import './context.test';
 import { RUN_2_CONTEXT } from './context.test';
 import './handoff.test';
 import './history.test';
+import './publish.test';
 import './workflows.test';
 import {
   type CompleteReport,

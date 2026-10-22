@@ -39,8 +39,8 @@ import {
   readArtifactFile,
   resolveHandoff,
 } from './handoff';
-import { composeStage, resolveStage, stepOutputs, summaryStage } from './handoff-cli';
-import { canonicalJson, MAX_RECORD_BYTES, sha256 } from './history';
+import { composeStage, payloadStage, resolveStage, stepOutputs, summaryStage } from './handoff-cli';
+import { canonicalJson, MAX_PAYLOAD_BYTES, MAX_RECORD_BYTES, sha256 } from './history';
 
 /**
  * CI artifact hand-off and the read-only dry run (Phase 5.3 M3c). Offline. API responses, the
@@ -859,7 +859,8 @@ function workFolder(
 const SNAPSHOT = read('snapshot/dashboard-data.json');
 const SUITES = canonicalJson(passingSuites());
 
-async function composed(): Promise<{ work: string; text: string }> {
+/** A composed run #2 record in a work folder (synthetic API data; shared with publish.test.ts). */
+export async function composed(): Promise<{ work: string; text: string }> {
   const { work, apiDir } = workFolder(api(), { snapshot: SNAPSHOT, suites: SUITES });
   await resolveStage(work, { api: apiDir });
   composeStage(work);
@@ -1066,10 +1067,127 @@ describe('hand-off: resolve and compose (offline, synthetic API data)', () => {
   });
 });
 
+// ---------------------------------------------------------------- publication payload
+
+describe('hand-off: publication payload for the publish job', () => {
+  const plan = (work: string, change: Record<string, unknown> = {}): void => {
+    const text = readFileSync(join(work, 'record.json'), 'utf8');
+    writeFileSync(
+      join(work, 'plan.json'),
+      JSON.stringify({
+        action: 'add',
+        path: 'v1/runs/39144953322-1.json',
+        sha256: sha256(text),
+        changed: ['v1/runs/39144953322-1.json', 'v1/index.json'],
+        dryRun: true,
+        ...change,
+      }),
+    );
+  };
+  const outputs = (text: string): Record<string, string> =>
+    Object.fromEntries(
+      text
+        .trim()
+        .split('\n')
+        .map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]),
+    );
+
+  test('a new record: publish=true, its SHA-256 and its exact canonical bytes in base64', async () => {
+    const { work, text } = await composed();
+    plan(work);
+    const out = outputs(payloadStage(work));
+    assert.deepEqual(Object.keys(out), ['publish', 'record-sha256', 'record-b64']);
+    assert.equal(out['publish'], 'true');
+    assert.equal(out['record-sha256'], sha256(text));
+    assert.equal(Buffer.from(out['record-b64'] ?? '', 'base64').toString('utf8'), text);
+    assert.match(out['record-b64'] ?? '', /^[A-Za-z0-9+/]+={0,2}$/);
+  });
+
+  test('an already published record: publish=false and no payload', async () => {
+    const { work, text } = await composed();
+    plan(work, { action: 'unchanged', changed: [] });
+    assert.equal(payloadStage(work), `publish=false\nrecord-sha256=${sha256(text)}\nrecord-b64=\n`);
+  });
+
+  const refusals: [string, (work: string) => void, RegExp][] = [
+    [
+      'a plan SHA-256 that differs',
+      (w) => {
+        plan(w, { sha256: 'f'.repeat(64) });
+      },
+      /the plan SHA-256 differs/,
+    ],
+    [
+      'a plan for another attempt',
+      (w) => {
+        plan(w, { path: 'v1/runs/39144953322-2.json' });
+      },
+      /the plan path is not the record path/,
+    ],
+    [
+      'an unknown plan action',
+      (w) => {
+        plan(w, { action: 'replace' });
+      },
+      /the plan action is unknown/,
+    ],
+    [
+      'a record that is not canonical',
+      (w) => {
+        const record = JSON.parse(readFileSync(join(w, 'record.json'), 'utf8')) as unknown;
+        writeFileSync(join(w, 'record.json'), JSON.stringify(record));
+        plan(w);
+      },
+      /record\.json is not in canonical form/,
+    ],
+    [
+      'a record larger than the hand-off limit',
+      (w) => {
+        const big = {
+          run: { id: 39144953322, attempt: 1 },
+          padding: 'x'.repeat(MAX_PAYLOAD_BYTES),
+        };
+        writeFileSync(join(w, 'record.json'), canonicalJson(big));
+        plan(w);
+      },
+      /the record is larger than the 65536-byte hand-off limit/,
+    ],
+    ['a missing plan', () => undefined, /plan\.json is missing/],
+  ];
+  for (const [name, prepare, reason] of refusals) {
+    test(`refuses ${name}`, async () => {
+      const { work } = await composed();
+      prepare(work);
+      refused(() => payloadStage(work), reason);
+    });
+  }
+
+  test('the payload CLI writes the outputs to GITHUB_OUTPUT and never prints the payload', async () => {
+    const { work } = await composed();
+    plan(work);
+    const file = join(work, 'outputs.txt');
+    writeFileSync(file, '');
+    const result = spawnSync(TSX, [join(__dirname, 'handoff-cli.ts'), 'payload', '--work', work], {
+      cwd: REPO,
+      encoding: 'utf8',
+      env: { PATH: process.env['PATH'] ?? '', GITHUB_OUTPUT: file },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(
+      readFileSync(file, 'utf8'),
+      /^publish=true\nrecord-sha256=[0-9a-f]{64}\nrecord-b64=[A-Za-z0-9+/]+={0,2}\n$/,
+    );
+    assert.match(
+      result.stdout,
+      /^publish=true\nrecord-sha256=[0-9a-f]{64}\nrecord-b64=<base64>\n$/,
+    );
+  });
+});
+
 // ---------------------------------------------------------------- job summary
 
 describe('hand-off: job summary', () => {
-  test('a complete dry run: stages, counts and the DRY RUN notice, no paths', async () => {
+  test('a complete compose: stages, counts and the read-only notice, no paths', async () => {
     const { work, text } = await composed();
     writeFileSync(
       join(work, 'plan.json'),
@@ -1083,7 +1201,10 @@ describe('hand-off: job summary', () => {
     );
     writeFileSync(join(work, 'check.json'), JSON.stringify({ check: 'passed' }));
     const summary = summaryStage(work);
-    assert.match(summary, /^## CI history: DRY RUN\n\nNothing was published\./);
+    assert.match(
+      summary,
+      /^## CI history: compose \(read-only\)\n\nThis job has read-only permissions and writes nothing\. A new record is published only by the separate publish job, after approval of the ci-history environment\./,
+    );
     assert.match(
       summary,
       /\| Run context \(workflow_run event\) \| run 39144953322, attempt 1, #2, push \|/,
@@ -1137,7 +1258,7 @@ describe('hand-off: job summary', () => {
     );
     const summary = summaryStage(work);
     assert.match(summary, /run \?, attempt \?, #\?, \?/);
-    assert.match(summary, /\| History plan \(empty history\) \| \? \?, sha256 \? \|/);
+    assert.match(summary, /\| History plan \(current ci-history\) \| \? \?, sha256 \? \|/);
     for (const text of ['rm -rf', '<script>', 'passwd', '`x`'])
       assert.ok(!summary.includes(text), text);
   });

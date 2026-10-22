@@ -125,7 +125,9 @@ describe('workflows: both files', () => {
       const scripts = steps(workflow).flatMap((s) => (s.run === undefined ? [] : [s.run]));
       assert.ok(scripts.length >= 8, String(scripts.length));
       for (const script of scripts) assert.ok(!script.includes('${{'), script);
-      assert.doesNotMatch(code(workflow), /secrets\.|pull_request_target|:\s*write\b/);
+      assert.doesNotMatch(code(workflow), /secrets\.|pull_request_target/);
+      // The single contents: write (the publish job) is checked exactly in its own test.
+      if (workflow === CI) assert.doesNotMatch(code(workflow), /:\s*write\b/);
     }
   });
 
@@ -300,8 +302,29 @@ describe('workflows: CI artifact hand-off (ci.yml)', () => {
   });
 });
 
-describe('workflows: CI history dry run (ci-history.yml)', () => {
+/** One job's block of a workflow (from `  <id>:` to the next job or the end). */
+function jobBlock(workflow: string, id: string): string {
+  const lines = workflow.split('\n');
+  const start = lines.indexOf(`  ${id}:`);
+  assert.ok(start >= 0, `job "${id}" not found`);
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((line) => /^ {2}[\w-]+:$/.test(line));
+  return [lines[start], ...(end === -1 ? rest : rest.slice(0, end))].join('\n');
+}
+
+const ELIGIBLE =
+  "github.event.workflow_run.status == 'completed' && " +
+  "(github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') && " +
+  "github.event.workflow_run.head_branch == 'main' && " +
+  'github.event.workflow_run.repository.full_name == github.repository && ' +
+  'github.event.workflow_run.head_repository.full_name == github.repository';
+const condition = (job: string): string | undefined =>
+  /^ {4}if: >-\n((?: {6}.+\n)+)/m.exec(`${job}\n`)?.[1]?.replace(/\s+/g, ' ').trim();
+
+describe('workflows: CI history (ci-history.yml)', () => {
   const c = code(HISTORY);
+  const COMPOSE = jobBlock(c, 'compose');
+  const PUBLISH = jobBlock(c, 'publish');
 
   test('triggered only by completed CI runs on main, through workflow_run', () => {
     assert.match(
@@ -314,26 +337,29 @@ describe('workflows: CI history dry run (ci-history.yml)', () => {
     );
   });
 
-  test('read-only: nothing by default, contents and actions read for the one job', () => {
-    assert.match(c, /^permissions: \{\}$/m);
-    assert.equal(c.match(/^ +permissions:/gm)?.length, 1);
-    assert.match(c, /^ {4}permissions:\n {6}contents: read\n {6}actions: read\n\n/m);
-    assert.doesNotMatch(c, /write|id-token|pages|upload-artifact|git push|git commit/);
-  });
-
-  test('refuses pull request, fork, wrong-branch and wrong-repository runs in the job condition', () => {
-    const condition = /^ {4}if: >-\n((?: {6}.+\n)+)/m.exec(c)?.[1]?.replace(/\s+/g, ' ').trim();
-    assert.equal(
-      condition,
-      "github.event.workflow_run.status == 'completed' && " +
-        "(github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') && " +
-        "github.event.workflow_run.head_branch == 'main' && " +
-        'github.event.workflow_run.repository.full_name == github.repository && ' +
-        'github.event.workflow_run.head_repository.full_name == github.repository',
+  test('exactly two jobs: compose (read-only) and publish (the only writer)', () => {
+    assert.deepEqual(
+      [...c.slice(c.indexOf('\njobs:\n')).matchAll(/^ {2}([\w-]+):$/gm)].map((m) => m[1]),
+      ['compose', 'publish'],
     );
+    assert.match(c, /^permissions: \{\}$/m);
+    assert.equal(c.match(/^ +permissions:/gm)?.length, 2);
+    assert.match(
+      COMPOSE,
+      /^ {4}permissions:\n {6}contents: read\n {6}actions: read\n {4}outputs:/m,
+    );
+    assert.match(PUBLISH, /^ {4}permissions:\n {6}contents: write\n\n/m);
+    // The only write anywhere is publish's contents: write.
+    assert.equal(c.match(/write/g)?.length, 1);
+    assert.doesNotMatch(c, /id-token|pages|upload-artifact|secrets\.|git push|git commit/);
   });
 
-  test('event values appear only in the job condition and the concurrency key', () => {
+  test('both jobs refuse pull request, fork, wrong-branch and wrong-repository runs', () => {
+    assert.equal(condition(COMPOSE), ELIGIBLE);
+    assert.equal(condition(PUBLISH), `needs.compose.outputs.publish == 'true' && ${ELIGIBLE}`);
+  });
+
+  test('event values appear only in the job conditions and the concurrency key', () => {
     const lines = c.split('\n').filter((l) => l.includes('github.event'));
     for (const line of lines) {
       assert.match(line, /^( {6}\(?github\.event\.workflow_run| {2}group: ci-history-)/, line);
@@ -344,15 +370,17 @@ describe('workflows: CI history dry run (ci-history.yml)', () => {
     );
   });
 
-  test('checks out trusted default-branch code without credentials', () => {
-    const s = step(HISTORY, 'Check out trusted default-branch code');
-    assert.equal(indexOf(HISTORY, s.name), 0);
+  // ------------------------------------------------------------ compose
+
+  test('compose checks out trusted default-branch code without credentials', () => {
+    const s = step(COMPOSE, 'Check out trusted default-branch code');
+    assert.equal(indexOf(COMPOSE, s.name), 0);
     assert.deepEqual(s.with, { 'persist-credentials': 'false' });
   });
 
-  test('steps run in the reviewed order; the summary always runs last', () => {
+  test('compose steps run in the reviewed order; the summary always runs last', () => {
     assert.deepEqual(
-      steps(HISTORY).map((s) => s.name),
+      steps(COMPOSE).map((s) => s.name),
       [
         'Check out trusted default-branch code',
         'Set up Node.js (.nvmrc)',
@@ -364,12 +392,42 @@ describe('workflows: CI history dry run (ci-history.yml)', () => {
         'Download dashboard snapshot',
         'Download suite results',
         'Compose run record',
-        'Plan history addition (dry run)',
-        'Publisher pre-check (dry run)',
+        'Check out the current ci-history branch (read-only)',
+        'Verify the current history',
+        'Plan history addition',
+        'Publisher pre-check',
+        'Prepare publication payload',
         'Job summary',
       ],
     );
-    assert.equal(step(HISTORY, 'Job summary').if, 'always()');
+    assert.equal(step(COMPOSE, 'Job summary').if, 'always()');
+  });
+
+  test('compose reads the current ci-history branch without credentials and verifies it fully', () => {
+    const s = step(COMPOSE, 'Check out the current ci-history branch (read-only)');
+    assert.equal(s.uses, 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1');
+    assert.deepEqual(s.with, {
+      ref: 'ci-history',
+      path: 'ci-history-current',
+      'persist-credentials': 'false',
+    });
+    assert.equal(
+      step(COMPOSE, 'Verify the current history').run,
+      './node_modules/.bin/tsx reporting/ci/history-cli.ts verify --history ci-history-current',
+    );
+  });
+
+  test('compose hands over only the checked payload, through declared job outputs', () => {
+    assert.match(
+      COMPOSE,
+      /^ {4}outputs:\n {6}publish: \$\{\{ steps\.payload\.outputs\.publish \}\}\n {6}record-b64: \$\{\{ steps\.payload\.outputs\.record-b64 \}\}\n {6}record-sha256: \$\{\{ steps\.payload\.outputs\.record-sha256 \}\}\n\n/m,
+    );
+    const s = step(COMPOSE, 'Prepare publication payload');
+    assert.equal(s.id, 'payload');
+    assert.equal(
+      s.run,
+      './node_modules/.bin/tsx reporting/ci/handoff-cli.ts payload --work "$RUNNER_TEMP/ci-history"',
+    );
   });
 
   test('downloads only by the resolved artifact ID of the triggering run, digest-checked', () => {
@@ -377,7 +435,7 @@ describe('workflows: CI history dry run (ci-history.yml)', () => {
       ['Download dashboard snapshot', 'snapshot-id', 'snapshot'],
       ['Download suite results', 'suites-id', 'suites'],
     ] as const) {
-      const s = step(HISTORY, name);
+      const s = step(COMPOSE, name);
       assert.equal(s.uses, DOWNLOAD);
       assert.deepEqual(s.with, {
         'artifact-ids': `\${{ steps.resolve.outputs.${output} }}`,
@@ -391,13 +449,14 @@ describe('workflows: CI history dry run (ci-history.yml)', () => {
       assert.ok(s.if?.startsWith(`steps.resolve.outputs.${output} != ''`), name);
     }
     assert.equal(c.match(/download-artifact@/g)?.length, 2);
+    assert.doesNotMatch(PUBLISH, /download-artifact/);
   });
 
   test('no archive is ever extracted: every upload is raw and every download skips decompression', () => {
     const uploads = steps(CI).filter((s) => s.uses?.startsWith('actions/upload-artifact@'));
     assert.equal(uploads.length, 2);
     for (const s of uploads) assert.equal(s.with['archive'], 'false', s.name);
-    const downloads = steps(HISTORY).filter((s) =>
+    const downloads = steps(COMPOSE).filter((s) =>
       s.uses?.startsWith('actions/download-artifact@'),
     );
     assert.equal(downloads.length, 2);
@@ -409,15 +468,18 @@ describe('workflows: CI history dry run (ci-history.yml)', () => {
     }
   });
 
-  test('later stages run only when the snapshot exists', () => {
+  test('later compose stages run only when the snapshot exists', () => {
     for (const name of [
       'Download suite results',
       'Compose run record',
-      'Plan history addition (dry run)',
-      'Publisher pre-check (dry run)',
+      'Check out the current ci-history branch (read-only)',
+      'Verify the current history',
+      'Plan history addition',
+      'Publisher pre-check',
+      'Prepare publication payload',
     ]) {
       assert.ok(
-        step(HISTORY, name).if?.includes("steps.resolve.outputs.recordable == 'true'"),
+        step(COMPOSE, name).if?.includes("steps.resolve.outputs.recordable == 'true'"),
         name,
       );
     }
@@ -429,26 +491,29 @@ describe('workflows: CI history dry run (ci-history.yml)', () => {
       /^node -e "const \[a, b, c\] = process\.versions\.node/,
       /^npm ci --ignore-scripts$/,
       /^node reporting\/ci\/event-shape\.mjs "\$GITHUB_EVENT_PATH" >> "\$GITHUB_STEP_SUMMARY"$/,
-      /^mkdir -p "\$(RUNNER_TEMP|work)\/[\w/-]+"$/,
+      /^mkdir -p "\$RUNNER_TEMP\/ci-history"$/,
       /^npm run -s ci:collect -- context --event "\$GITHUB_EVENT_PATH" --workflow CI --out "\$RUNNER_TEMP\/ci-history\/context\.json"$/,
-      /^\.\/node_modules\/\.bin\/tsx reporting\/ci\/handoff-cli\.ts (resolve|compose) --work "\$RUNNER_TEMP\/ci-history"$/,
+      /^\.\/node_modules\/\.bin\/tsx reporting\/ci\/handoff-cli\.ts (resolve|compose|payload) --work "\$RUNNER_TEMP\/ci-history"$/,
+      /^\.\/node_modules\/\.bin\/tsx reporting\/ci\/history-cli\.ts verify --history ci-history-current$/,
       /^set -euo pipefail$/,
       /^work="\$RUNNER_TEMP\/ci-history"$/,
-      /^\.\/node_modules\/\.bin\/tsx reporting\/ci\/history-cli\.ts plan --history "\$work\/empty-history" --record "\$work\/record\.json" > "\$work\/plan\.json\.tmp"$/,
+      /^\.\/node_modules\/\.bin\/tsx reporting\/ci\/history-cli\.ts plan --history ci-history-current --record "\$work\/record\.json" > "\$work\/plan\.json\.tmp"$/,
       /^mv "\$work\/(plan|check)\.json\.tmp" "\$work\/(plan|check)\.json"$/,
       /^sha="\$\(node -p "JSON\.parse\(require\('node:fs'\)\.readFileSync\(process\.argv\[1\], 'utf8'\)\)\.sha256" "\$work\/plan\.json"\)"$/,
-      /^node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON reporting\/ci\/publish-check\.mjs --event "\$GITHUB_EVENT_PATH" --record "\$work\/record\.json" --sha256 "\$sha" --history "\$work\/empty-history" > "\$work\/check\.json\.tmp"$/,
+      /^node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON reporting\/ci\/publish-check\.mjs --event "\$GITHUB_EVENT_PATH" --record "\$work\/record\.json" --sha256 "\$sha" --history ci-history-current > "\$work\/check\.json\.tmp"$/,
       /^if ! \.\/node_modules\/\.bin\/tsx reporting\/ci\/handoff-cli\.ts summary --work "\$RUNNER_TEMP\/ci-history" >> "\$GITHUB_STEP_SUMMARY"; then$/,
-      /^printf '## CI history: DRY RUN\\n\\nNothing was published\. [^']*' >> "\$GITHUB_STEP_SUMMARY"$/,
+      /^printf '## CI history: compose \(read-only\)\\n\\nNothing was written\. [^']*' >> "\$GITHUB_STEP_SUMMARY"$/,
       /^fi$/,
+      // publish job
+      /^node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tools\/reporting\/ci\/publish\.mjs --event "\$GITHUB_EVENT_PATH" --history history$/,
     ];
-    const commands = steps(HISTORY).flatMap((s) =>
+    const commands = steps(c).flatMap((s) =>
       (s.run ?? '')
         .split('\n')
         .map((l) => l.trim())
         .filter((l) => l !== ''),
     );
-    assert.ok(commands.length >= 18);
+    assert.ok(commands.length >= 22);
     for (const command of commands) {
       assert.ok(
         allowed.some((pattern) => pattern.test(command)),
@@ -458,23 +523,83 @@ describe('workflows: CI history dry run (ci-history.yml)', () => {
   });
 
   test('the token reaches only the resolver (as GITHUB_TOKEN) and the download action', () => {
-    const users = steps(HISTORY).filter((s) => s.text.includes('github.token'));
+    const users = steps(c).filter((s) => s.text.includes('github.token'));
     assert.deepEqual(
       users.map((s) => s.name),
       ['Resolve hand-off artifacts', 'Download dashboard snapshot', 'Download suite results'],
     );
-    assert.deepEqual(step(HISTORY, 'Resolve hand-off artifacts').env, {
+    assert.deepEqual(step(COMPOSE, 'Resolve hand-off artifacts').env, {
       GITHUB_TOKEN: '${{ github.token }}',
     });
-    assert.equal(step(HISTORY, 'Resolve hand-off artifacts').id, 'resolve');
+    assert.equal(step(COMPOSE, 'Resolve hand-off artifacts').id, 'resolve');
   });
 
   test('scripts that redirect output run with pipefail and replace their result only on success', () => {
-    for (const name of ['Plan history addition (dry run)', 'Publisher pre-check (dry run)']) {
-      const s = step(HISTORY, name);
+    for (const name of ['Plan history addition', 'Publisher pre-check']) {
+      const s = step(COMPOSE, name);
       assert.equal(s.shell, 'bash', name);
       assert.ok(s.run?.startsWith('set -euo pipefail\n'), name);
     }
+  });
+
+  // ------------------------------------------------------------ publish
+
+  test('publish waits for compose and for approval of the ci-history environment', () => {
+    assert.match(PUBLISH, /^ {4}needs: compose$/m);
+    assert.match(PUBLISH, /^ {4}environment: ci-history$/m);
+    assert.match(PUBLISH, /^ {4}runs-on: ubuntu-24\.04$/m);
+    assert.match(PUBLISH, /^ {4}timeout-minutes: 10$/m);
+  });
+
+  test('publish runs only trusted code: no install, no artifact, credentials only for the last step', () => {
+    assert.deepEqual(
+      steps(PUBLISH).map((s) => [s.name, s.uses ?? 'run']),
+      [
+        [
+          'Check out trusted publisher code',
+          'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
+        ],
+        [
+          'Set up Node.js (.nvmrc)',
+          'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0',
+        ],
+        ['Check Node.js version', 'run'],
+        [
+          'Check out the ci-history branch',
+          'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1',
+        ],
+        ['Publish the run record', 'run'],
+      ],
+    );
+    assert.deepEqual(step(PUBLISH, 'Check out trusted publisher code').with, {
+      path: 'tools',
+      'persist-credentials': 'false',
+    });
+    assert.deepEqual(step(PUBLISH, 'Set up Node.js (.nvmrc)').with, {
+      'node-version-file': 'tools/.nvmrc',
+    });
+    // The one checkout that keeps push credentials comes after every third-party action.
+    assert.deepEqual(step(PUBLISH, 'Check out the ci-history branch').with, {
+      ref: 'ci-history',
+      path: 'history',
+      'persist-credentials': 'true',
+    });
+    assert.doesNotMatch(
+      PUBLISH,
+      /npm |npx |tsx|node_modules|upload-artifact|download-artifact|github\.token|secrets/,
+    );
+  });
+
+  test('publish receives the record only through env, from the declared compose outputs', () => {
+    const s = step(PUBLISH, 'Publish the run record');
+    assert.deepEqual(s.env, {
+      CI_HISTORY_RECORD_B64: '${{ needs.compose.outputs.record-b64 }}',
+      CI_HISTORY_RECORD_SHA256: '${{ needs.compose.outputs.record-sha256 }}',
+    });
+    assert.equal(
+      s.run,
+      'node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON tools/reporting/ci/publish.mjs --event "$GITHUB_EVENT_PATH" --history history',
+    );
   });
 
   test('YAML is well-formed (Ruby Psych, when available)', (t) => {
