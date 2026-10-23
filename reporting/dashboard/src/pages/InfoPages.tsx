@@ -1,4 +1,5 @@
 import { Callout, Card, PageHeader } from '../components/ui';
+import type { VerifiedAgentLayer } from '../data/agents';
 import { shortSha } from '../data/derive';
 import { type ExecutionHistory, formatInstant } from '../data/history';
 import type { Snapshot } from '../data/types';
@@ -7,9 +8,11 @@ import { href } from '../router';
 export function HowToRead({
   snapshot,
   history = null,
+  agents = null,
 }: {
   snapshot: Snapshot;
   history?: ExecutionHistory | null;
+  agents?: VerifiedAgentLayer | null;
 }) {
   const { source, summary } = snapshot;
   const coverage = `${String(summary.linkedTestCasesWithIntentYes)} of ${String(summary.testCasesByAutomationIntent.Yes)}`;
@@ -18,8 +21,9 @@ export function HowToRead({
       <PageHeader eyebrow="Definitions" title="How to read this dashboard">
         <p>
           Every figure comes from validated build-time data: the snapshot of the approved documents
-          and committed tests, and, when included, the published CI history. Four measures are kept
-          apart, because each one says less than it may seem to.
+          and committed tests, when included the published CI history, and the agent layer facts,
+          checked against committed files. Four measures are kept apart, because each one says less
+          than it may seem to.
         </p>
       </PageHeader>
 
@@ -112,6 +116,23 @@ export function HowToRead({
               )}
             </dd>
           </div>
+          <div className="meta-row">
+            <dt>AI agent layer facts</dt>
+            <dd>
+              {agents === null ? (
+                'Not included in this build'
+              ) : (
+                <>
+                  Checked against the committed files of commit <code>{agents.commit}</code> when
+                  this site was built; no agent activity is recorded or shown
+                </>
+              )}
+            </dd>
+          </div>
+          <div className="meta-row">
+            <dt>Defect register</dt>
+            <dd>Not connected; no defect records are shown or derived</dd>
+          </div>
         </dl>
         <p className="fine-print">
           The snapshot is built only when the approved documents, the tests and everything
@@ -134,35 +155,11 @@ export function HowToRead({
             is counted as passed or failed.
           </li>
           <li>Live AI model activity: the agent suite in CI is tested with a fake model.</li>
+          <li>
+            Defects derived from test results: a failed test is an execution result, not a defect
+            record.
+          </li>
         </ul>
-      </Card>
-    </>
-  );
-}
-
-const UNAVAILABLE = {
-  'ai-agents': {
-    title: 'AI Agents',
-    body: 'The agent layer (a Generator agent, a deterministic validator and human approval gates) exists in the repository, but its activity is not exported to this dashboard yet. Proposals will only be shown from a reviewed, sanitized export, and never their code.',
-  },
-  defects: {
-    title: 'Defects',
-    body: 'No defect records exist yet. This page will list defects backed by real evidence, and later a Jira integration, linked to test cases by ID.',
-  },
-} as const;
-
-export function NotAvailable({ kind }: { kind: keyof typeof UNAVAILABLE }) {
-  const page = UNAVAILABLE[kind];
-  return (
-    <>
-      <PageHeader eyebrow="Not available yet" title={page.title} />
-      <Card>
-        <Callout title="This integration is not connected" tone="empty">
-          <p>{page.body}</p>
-        </Callout>
-        <p>
-          <a href={href('/how-to-read')}>How to read this dashboard</a>
-        </p>
       </Card>
     </>
   );

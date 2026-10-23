@@ -16,8 +16,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/test-plan', label: 'Test Plan' },
   { path: '/test-cases', label: 'Test Cases' },
   { path: '/executions', label: 'Executions' },
-  { path: '/ai-agents', label: 'AI Agents', unavailable: true },
-  { path: '/defects', label: 'Defects', unavailable: true },
+  { path: '/ai-agents', label: 'AI Agents' },
+  { path: '/defects', label: 'Defects' },
   { path: '/how-to-read', label: 'How to read this dashboard' },
 ];
 
@@ -145,12 +145,16 @@ export function Layout({
         aria-label="Primary"
       >
         <ul className="nav-list">{available.map(link)}</ul>
-        <p className="nav-heading" id="nav-unavailable">
-          Not available yet
-        </p>
-        <ul className="nav-list" aria-labelledby="nav-unavailable">
-          {unavailable.map(link)}
-        </ul>
+        {unavailable.length > 0 && (
+          <>
+            <p className="nav-heading" id="nav-unavailable">
+              Not available yet
+            </p>
+            <ul className="nav-list" aria-labelledby="nav-unavailable">
+              {unavailable.map(link)}
+            </ul>
+          </>
+        )}
         <ul className="nav-list nav-help">{help.map(link)}</ul>
         <p className="nav-provenance">
           Snapshot of commit <code>{shortSha(snapshot.source.commit)}</code>

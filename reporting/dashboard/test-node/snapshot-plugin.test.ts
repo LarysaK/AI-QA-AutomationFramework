@@ -8,6 +8,7 @@ import { build } from 'vite';
 import { afterAll, describe, expect, test } from 'vitest';
 
 import { validateSnapshot } from '../../dashboard-data/validate';
+import { verifiedAgentLayer } from '../build/agent-layer-plugin';
 import { validatedHistory } from '../build/history-plugin';
 import { validatedSnapshot } from '../build/snapshot-plugin';
 
@@ -52,6 +53,7 @@ async function buildWith(snapshot: unknown): Promise<string> {
         repoRoot: REPO_ROOT,
         required: false,
       }),
+      verifiedAgentLayer({ repoRoot: REPO_ROOT }),
     ],
     build: { outDir, emptyOutDir: true },
   });

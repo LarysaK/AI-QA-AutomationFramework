@@ -1,17 +1,19 @@
 import { Component, lazy, type ReactNode, Suspense, useEffect, useRef } from 'react';
 
 import { Layout } from './components/Layout';
+import type { VerifiedAgentLayer } from './data/agents';
+import { type DefectSource, NOT_CONNECTED } from './data/defects';
 import type { ExecutionHistory } from './data/history';
 import type { Snapshot } from './data/types';
-import { HowToRead, NotAvailable, NotFound } from './pages/InfoPages';
+import { HowToRead, NotFound } from './pages/InfoPages';
 import { Overview } from './pages/Overview';
 import { href, type Route, useRoute } from './router';
 
 /*
  * Route-level code splitting: the Overview and the small information pages are in the entry
- * chunk; the pages that need the Markdown renderer (test plan, test cases) and the execution views
- * are separate same-origin chunks, loaded when first visited. They are static files of this
- * build, allowed by script-src 'self'; nothing is fetched from elsewhere.
+ * chunk; the pages that need the Markdown renderer (test plan, test cases), the execution views
+ * and the agent and defect views are separate same-origin chunks, loaded when first visited. They
+ * are static files of this build, allowed by script-src 'self'; nothing is fetched from elsewhere.
  */
 const TestPlanPage = lazy(() =>
   import('./pages/TestPlanPage').then((m) => ({ default: m.TestPlanPage })),
@@ -28,12 +30,24 @@ const ExecutionsPage = lazy(() =>
 const ExecutionDetail = lazy(() =>
   import('./pages/ExecutionsPage').then((m) => ({ default: m.ExecutionDetail })),
 );
+const AgentsPage = lazy(() =>
+  import('./pages/AgentsPage').then((m) => ({ default: m.AgentsPage })),
+);
+const DefectsPage = lazy(() =>
+  import('./pages/DefectsPage').then((m) => ({ default: m.DefectsPage })),
+);
 
 const TITLE = 'RequestFlow QA Dashboard';
 
+interface Inputs {
+  readonly snapshot: Snapshot;
+  readonly history: ExecutionHistory | null;
+  readonly agents: VerifiedAgentLayer | null;
+  readonly defects: DefectSource;
+}
+
 function page(
-  snapshot: Snapshot,
-  history: ExecutionHistory | null,
+  { snapshot, history, agents, defects }: Inputs,
   route: Route,
 ): { title: string; element: ReactNode } {
   const { path, query } = route;
@@ -62,13 +76,16 @@ function page(
     case '/executions':
       return { title: 'Executions', element: <ExecutionsPage history={history} /> };
     case '/ai-agents':
-      return { title: 'AI Agents', element: <NotAvailable kind="ai-agents" /> };
+      return { title: 'AI Agents', element: <AgentsPage agents={agents} history={history} /> };
     case '/defects':
-      return { title: 'Defects', element: <NotAvailable kind="defects" /> };
+      return {
+        title: 'Defects',
+        element: <DefectsPage snapshot={snapshot} defects={defects} agents={agents} />,
+      };
     case '/how-to-read':
       return {
         title: 'How to read this dashboard',
-        element: <HowToRead snapshot={snapshot} history={history} />,
+        element: <HowToRead snapshot={snapshot} history={history} agents={agents} />,
       };
     default:
       return { title: 'Page not found', element: <NotFound /> };
@@ -140,12 +157,16 @@ function RouteFocus({ route }: { route: Route }) {
 export function App({
   snapshot,
   history = null,
+  agents = null,
+  defects = NOT_CONNECTED,
 }: {
   snapshot: Snapshot;
   history?: ExecutionHistory | null;
+  agents?: VerifiedAgentLayer | null;
+  defects?: DefectSource;
 }) {
   const route = useRoute();
-  const { title, element } = page(snapshot, history, route);
+  const { title, element } = page({ snapshot, history, agents, defects }, route);
 
   useEffect(() => {
     document.title = `${title} · ${TITLE}`;
