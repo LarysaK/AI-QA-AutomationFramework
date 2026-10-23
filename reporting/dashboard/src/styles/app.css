@@ -596,6 +596,41 @@ h1 {
   min-width: 13rem;
 }
 
+/* Agent layer tables: prose cells keep a readable width and scroll sideways on small screens. */
+.agent-table {
+  min-width: 44rem;
+}
+
+.agent-table tbody th {
+  min-width: 9rem;
+}
+
+.agent-table td {
+  min-width: 8rem;
+}
+
+.agent-table td.prose {
+  min-width: 13rem;
+}
+
+.agent-table .badge {
+  white-space: nowrap;
+}
+
+/* The AI Agents status callout stands directly above the stat cards. */
+.callout + .stats {
+  margin-top: 16px;
+}
+
+.agent-duties {
+  margin-top: 16px;
+}
+
+.evidence-list {
+  columns: 2 18rem;
+  column-gap: 24px;
+}
+
 /* A short description under a table row heading. */
 .cell-note {
   display: block;

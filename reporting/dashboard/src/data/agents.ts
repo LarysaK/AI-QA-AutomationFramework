@@ -1,0 +1,793 @@
+/**
+ * The AI agent layer as the repository records it: which components exist, what is implemented
+ * and tested, which guards and human approval gates apply, and whether a real AI model is used.
+ *
+ * Every statement carries evidence in a committed file. build/agent-layer-plugin.ts checks all
+ * of it against the commit being built (each quote must appear in its file, each absent path must
+ * have no committed file, each tracked file must be committed, each excluded text must not
+ * appear), and also that every guard and gate row matches the Agent Standard's own tables. A
+ * statement that no longer holds fails the build; nothing is embedded unchecked.
+ *
+ * Deliberately absent: agent execution history, model usage, tokens, costs, proposals, approval
+ * events and success rates. The repository records none of them (see NOT_RECORDED).
+ */
+
+export type Evidence =
+  /** The file at the commit contains this text (whitespace-insensitive). */
+  | { readonly path: string; readonly quote: string }
+  /** The file at the commit does not contain this text. */
+  | { readonly path: string; readonly excludes: string }
+  /** The file is committed. */
+  | { readonly path: string; readonly tracked: true }
+  /** No committed file is at or under this path. */
+  | { readonly path: string; readonly absent: true };
+
+export interface Fact {
+  readonly text: string;
+  readonly evidence: readonly Evidence[];
+}
+
+export type ComponentStatus = 'implemented' | 'specified-only';
+
+export interface Component {
+  readonly id: string;
+  readonly name: string;
+  readonly kind: 'AI agent' | 'Deterministic orchestrator';
+  readonly status: ComponentStatus;
+  readonly purpose: Fact;
+  readonly responsibilities: readonly Fact[];
+  readonly code: Fact;
+  readonly tests: Fact;
+  readonly approval: Fact;
+}
+
+export type GuardId =
+  'G-SCHEMA' | 'G-PATHS' | 'G-BASE' | 'G-TRACE' | 'G-STATIC' | 'G-DISCOVERY' | 'G-RUN';
+
+export interface Guard {
+  readonly id: GuardId;
+  /** Verbatim from the Agent Standard's guard table. */
+  readonly checks: string;
+  readonly executionCapable: boolean;
+  readonly implementation: string;
+  readonly tests: Fact;
+}
+
+export type GateId = 'H1' | 'H2' | 'H3' | 'H4' | 'H5' | 'H6' | 'H7';
+
+export interface Gate {
+  readonly id: GateId;
+  /** Verbatim from the Agent Standard's gate table. */
+  readonly requires: string;
+  /** How the gate stands in this repository today. */
+  readonly here: Fact;
+}
+
+export interface AgentLayer {
+  readonly standard: Fact;
+  readonly principle: Fact;
+  /** What the standard counts as an agent; the AI-agent components must be exactly these roles. */
+  readonly agentRoles: Fact;
+  readonly components: readonly Component[];
+  readonly guards: readonly Guard[];
+  readonly gates: readonly Gate[];
+  readonly modelExecution: {
+    /** The current H7 status. */
+    readonly h7: Fact;
+    readonly liveModeInCode: Fact;
+    readonly ci: Fact;
+    readonly fakeModelTests: Fact;
+    readonly liveRuns: Fact;
+    /** A historical local demonstration; neither a live run nor a current authorization. */
+    readonly offlineDemo: Fact;
+  };
+  readonly notRecorded: readonly Fact[];
+  readonly defectCandidates: Fact;
+}
+
+/** The agent layer facts, embedded only after build/agent-layer-plugin.ts has checked them. */
+export interface VerifiedAgentLayer {
+  /** The commit whose committed files the evidence was checked against. */
+  readonly commit: string;
+  readonly layer: AgentLayer;
+}
+
+const STANDARD = 'agents/standard/standard.md';
+const README = 'README.md';
+const GENERATOR_DOC = 'docs/generator-agent.md';
+const GENERATOR_DEF = 'agents/definitions/generator/definition.md';
+const ADR = 'docs/adr/0001-ai-outside-test-runtime.md';
+const CI = '.github/workflows/ci.yml';
+const PACKAGE = 'package.json';
+const GEN = 'agents/orchestrator/generator';
+const VAL = 'agents/orchestrator/validation';
+
+const notImplemented = (agent: 'planner' | 'analyzer' | 'healer', label: string): Evidence[] => [
+  { path: `agents/definitions/${agent}`, absent: true },
+  { path: `agents/orchestrator/${agent}`, absent: true },
+  { path: README, quote: `- [ ] ${label} agent` },
+];
+
+const specifiedOnly = (
+  id: 'planner' | 'analyzer' | 'healer',
+  name: string,
+  purpose: Fact,
+  approval: Fact,
+): Component => ({
+  id,
+  name,
+  kind: 'AI agent',
+  status: 'specified-only',
+  purpose,
+  responsibilities: [],
+  code: {
+    text: 'Not implemented: no agent definition and no orchestrator code.',
+    evidence: notImplemented(id, name.replace(/ agent$/, '')),
+  },
+  tests: {
+    text: 'None (nothing to test).',
+    evidence: notImplemented(id, name.replace(/ agent$/, '')),
+  },
+  approval,
+});
+
+export const AGENT_LAYER: AgentLayer = {
+  standard: {
+    text: 'Agent Standard v1.2 (frozen) is the shared contract for every agent and for the orchestrator.',
+    evidence: [
+      { path: STANDARD, quote: '# Agent Standard v1.2' },
+      { path: STANDARD, quote: '| Status | Frozen |' },
+      {
+        path: STANDARD,
+        quote: '| Applies to | Planner, Generator, Analyzer, Healer, and the orchestrator |',
+      },
+    ],
+  },
+  principle: {
+    text: 'AI proposes, deterministic code validates, a human approves. AI agents are outside the deterministic Playwright runtime: the product tests never import or call an agent or an LLM SDK.',
+    evidence: [
+      {
+        path: STANDARD,
+        quote: '**AI proposes, deterministic code validates, a human approves** (ADR-0001).',
+      },
+      { path: ADR, quote: '**AI agents are outside the deterministic Playwright runtime.**' },
+      {
+        path: 'eslint.config.mjs',
+        quote: 'ADR-0001: runtime code must not import the agent layer (agents/**).',
+      },
+      {
+        path: `${GEN}/eslint-boundary.test.ts`,
+        quote: "describe('ADR-0001 import boundary (ESLint)'",
+      },
+    ],
+  },
+  agentRoles: {
+    text: 'The Agent Standard defines four AI agents, each an LLM-backed role: Planner, Generator, Analyzer and Healer. The Validator is not an agent: it is part of the orchestrator, deterministic code that runs the guards.',
+    evidence: [
+      {
+        path: STANDARD,
+        quote:
+          '| Agent | An LLM-backed role (Planner, Generator, Analyzer, Healer) that reads and proposes |',
+      },
+      {
+        path: STANDARD,
+        quote:
+          '| Orchestrator | Deterministic code that prepares tasks, stages artifacts, runs guards and applies changes |',
+      },
+    ],
+  },
+  components: [
+    {
+      id: 'generator',
+      name: 'Generator agent',
+      kind: 'AI agent',
+      status: 'implemented',
+      purpose: {
+        text: 'Proposes exactly one new Playwright TypeScript test file for one explicitly selected, approved test case.',
+        evidence: [
+          {
+            path: GENERATOR_DEF,
+            quote:
+              'The Generator proposes **exactly one new Playwright TypeScript test file** for one explicitly selected, approved test case.',
+          },
+          { path: GENERATOR_DEF, quote: 'definitionVersion: 1.0' },
+        ],
+      },
+      responsibilities: [
+        {
+          text: 'Selects the test case deterministically before any model call: it must be in the approved test plan with Automation: Yes.',
+          evidence: [
+            {
+              path: GENERATOR_DEF,
+              quote: '## Preconditions (deterministic, before any model call)',
+            },
+          ],
+        },
+        {
+          text: 'Builds a deterministic context pack of at most 64 KB, never truncated, with a manifest of every source.',
+          evidence: [
+            { path: GENERATOR_DOC, quote: 'a deterministic pack, at most 64 KB, never truncated' },
+          ],
+        },
+        {
+          text: 'Makes one model call, then rejects refusals, invalid JSON and schema violations; model output is never repaired.',
+          evidence: [
+            { path: GENERATOR_DOC, quote: 'one call through the `ModelClient` interface' },
+            { path: GENERATOR_DOC, quote: 'Model output is never repaired.' },
+          ],
+        },
+        {
+          text: 'Stages the proposal under artifacts/proposals/ (gitignored) and runs the validator without execution authorization. It never edits the repository and never applies a proposal.',
+          evidence: [
+            {
+              path: GENERATOR_DOC,
+              quote:
+                'The Generator never edits the repository. It stages a proposal under `artifacts/proposals/<taskId>/`, runs the validator without execution authorization, and stops.',
+            },
+            {
+              path: `${GEN}/generate.ts`,
+              quote: 'never applies a proposal and never supplies H7 execution authorization.',
+            },
+            { path: '.gitignore', quote: 'artifacts/*' },
+          ],
+        },
+      ],
+      code: {
+        text: 'Definition, output schema and prompt in agents/definitions/generator/; orchestrator in agents/orchestrator/generator/ (npm run agents:generate).',
+        evidence: [
+          { path: GENERATOR_DEF, tracked: true },
+          { path: 'agents/definitions/generator/generator-output.schema.json', tracked: true },
+          { path: 'agents/definitions/generator/prompt.md', tracked: true },
+          { path: `${GEN}/generate.ts`, tracked: true },
+          { path: `${GEN}/model-client.ts`, tracked: true },
+          { path: PACKAGE, quote: '"agents:generate": "tsx agents/orchestrator/generator/cli.ts"' },
+        ],
+      },
+      tests: {
+        text: 'Automated tests with a fake model: no provider is contacted. Part of the agent suite in CI.',
+        evidence: [
+          {
+            path: `${GEN}/generator.test.ts`,
+            quote: 'The model is always a fake; no provider is contacted.',
+          },
+          { path: PACKAGE, quote: 'agents/orchestrator/generator/generator.test.ts' },
+        ],
+      },
+      approval: {
+        text: 'Running a proposed test needs H7; applying it to tests/ needs H2. Both are separate human decisions.',
+        evidence: [
+          {
+            path: GENERATOR_DOC,
+            quote:
+              'Running the proposed test (H7) and applying it to `tests/` (H2) are separate human decisions.',
+          },
+        ],
+      },
+    },
+    {
+      id: 'validator',
+      name: 'Validator',
+      kind: 'Deterministic orchestrator',
+      status: 'implemented',
+      purpose: {
+        text: 'Validates one agent artifact against the repository with seven deterministic guards. No AI is involved, and it is read-only.',
+        evidence: [
+          {
+            path: `${VAL}/cli.ts`,
+            quote:
+              'Validates one agent artifact against the repository in the current directory. Read-only.',
+          },
+          {
+            path: README,
+            quote:
+              '- [x] Deterministic validator with seven guards and human execution authorization (H7)',
+          },
+        ],
+      },
+      responsibilities: [
+        {
+          text: 'Runs the guards in order and stops at the first failing guard.',
+          evidence: [
+            {
+              path: `${VAL}/validate.ts`,
+              quote: 'Runs the implemented guards in order and stops at the first failing guard;',
+            },
+          ],
+        },
+        {
+          text: 'Never runs proposed code without H7: the execution-capable guards G-DISCOVERY and G-RUN run only with a human authorization for the exact artifact SHA-256, given on the command line and never read from the artifact or the environment.',
+          evidence: [
+            {
+              path: `${VAL}/validate.ts`,
+              quote:
+                "export const EXECUTION_CAPABLE_GUARDS: readonly GuardName[] = ['G-DISCOVERY', 'G-RUN'];",
+            },
+            {
+              path: `${VAL}/validate.ts`,
+              quote:
+                '// Execution boundary (gate H7): nothing below runs proposed code without authorization.',
+            },
+            {
+              path: `${VAL}/cli.ts`,
+              quote: 'the SHA-256 of the exact artifact bytes, given on the',
+            },
+            {
+              path: `${VAL}/cli.ts`,
+              quote: 'It is never read from the artifact or the environment.',
+            },
+          ],
+        },
+        {
+          text: 'Without H7 the result is INCOMPLETE (exit 3), never VALIDATED.',
+          evidence: [
+            { path: GENERATOR_DOC, quote: 'Without H7 the validator ends `INCOMPLETE` (exit 3).' },
+          ],
+        },
+      ],
+      code: {
+        text: 'agents/orchestrator/validation/ (npm run agents:validate).',
+        evidence: [
+          { path: `${VAL}/validate.ts`, tracked: true },
+          {
+            path: PACKAGE,
+            quote: '"agents:validate": "tsx agents/orchestrator/validation/cli.ts"',
+          },
+        ],
+      },
+      tests: {
+        text: 'Automated tests of every guard and of the H7 boundary. Deterministic: no model is involved. Part of the agent suite in CI.',
+        evidence: [
+          {
+            path: PACKAGE,
+            quote: '"agents:test": "tsx --test agents/orchestrator/validation/validate.test.ts',
+          },
+          {
+            path: `${VAL}/discovery-guard.test.ts`,
+            quote: "describe('execution authorization (gate H7)'",
+          },
+          {
+            path: `${VAL}/cli.test.ts`,
+            quote: "describe('agents:validate CLI and execution authorization'",
+          },
+        ],
+      },
+      approval: {
+        text: 'H7 before any execution-capable guard runs proposed code. Authorizing execution does not approve applying the change.',
+        evidence: [
+          {
+            path: STANDARD,
+            quote:
+              'H7 is distinct from H2 and H3: authorizing execution lets proposed code run for validation',
+          },
+        ],
+      },
+    },
+    specifiedOnly(
+      'planner',
+      'Planner agent',
+      {
+        text: 'Defined in the Agent Standard: proposes test-plan changes, and is the only agent that may propose new (provisional) test-case IDs, approved only through gate H1.',
+        evidence: [
+          {
+            path: STANDARD,
+            quote:
+              'Only the Planner may propose new TC IDs; they are provisional, are carried in the Planner payload, and become approved only through gate H1.',
+          },
+        ],
+      },
+      {
+        text: 'H1 for test-plan changes.',
+        evidence: [
+          {
+            path: STANDARD,
+            quote: '| H1 | Test-plan changes, including provisional TC IDs (Planner) |',
+          },
+        ],
+      },
+    ),
+    specifiedOnly(
+      'analyzer',
+      'Analyzer agent',
+      {
+        text: 'Defined in the Agent Standard: reads run evidence after execution and reports, citing the test, its tags, TC, REQ, the run and the evidence paths.',
+        evidence: [
+          {
+            path: STANDARD,
+            quote:
+              'Analyzer reports cite the test file, test title, tags, TC, REQ, the run and the evidence paths.',
+          },
+          { path: STANDARD, quote: '**Run evidence** — Analyzer and Healer only' },
+        ],
+      },
+      {
+        text: 'None: the standard needs no approval for Analyzer reports.',
+        evidence: [
+          {
+            path: STANDARD,
+            quote:
+              'No approval is needed for context discovery, Analyzer reports, validation runs, or discarding an artifact.',
+          },
+        ],
+      },
+    ),
+    specifiedOnly(
+      'healer',
+      'Healer agent',
+      {
+        text: 'Defined in the Agent Standard: proposes healing patches that modify existing tests, after validation.',
+        evidence: [
+          { path: STANDARD, quote: '| H3 | Healing patches, after validation (Healer) |' },
+          { path: STANDARD, quote: 'Generator (create), Healer (modify)' },
+        ],
+      },
+      {
+        text: 'H3 for healing patches.',
+        evidence: [
+          { path: STANDARD, quote: '| H3 | Healing patches, after validation (Healer) |' },
+        ],
+      },
+    ),
+  ],
+  guards: [
+    {
+      id: 'G-SCHEMA',
+      checks: 'Envelope, and payload once a payload schema exists',
+      executionCapable: false,
+      implementation: `${VAL}/schema-guard.ts`,
+      tests: {
+        text: 'validate.test.ts',
+        evidence: [{ path: `${VAL}/validate.test.ts`, quote: "describe('G-SCHEMA'" }],
+      },
+    },
+    {
+      id: 'G-PATHS',
+      checks:
+        'Path class and `changeKind` permitted for the agent; Protected untouched; default deny',
+      executionCapable: false,
+      implementation: `${VAL}/path-guard.ts`,
+      tests: {
+        text: 'validate.test.ts',
+        evidence: [{ path: `${VAL}/validate.test.ts`, quote: "describe('G-PATHS'" }],
+      },
+    },
+    {
+      id: 'G-BASE',
+      checks: '`modify` has a matching `baseSha`; `create` targets a non-existent file',
+      executionCapable: false,
+      implementation: `${VAL}/base-guard.ts`,
+      tests: {
+        text: 'validate.test.ts',
+        evidence: [{ path: `${VAL}/validate.test.ts`, quote: "describe('G-BASE'" }],
+      },
+    },
+    {
+      id: 'G-TRACE',
+      checks:
+        "Cited IDs exist; new tests' tags match declared TCs; no `@CAN`; modified tests keep their tags",
+      executionCapable: false,
+      implementation: `${VAL}/trace-guard.ts`,
+      tests: {
+        text: 'trace-guard.test.ts',
+        evidence: [{ path: `${VAL}/trace-guard.test.ts`, quote: "describe('G-TRACE: failing'" }],
+      },
+    },
+    {
+      id: 'G-STATIC',
+      checks: '`typecheck`, `lint` and `format:check` on the proposed state',
+      executionCapable: false,
+      implementation: `${VAL}/static-guard.ts`,
+      tests: {
+        text: 'static-guard.test.ts',
+        evidence: [
+          {
+            path: `${VAL}/static-guard.test.ts`,
+            quote: "describe('G-STATIC: real checks on a copy of this repository'",
+          },
+        ],
+      },
+    },
+    {
+      id: 'G-DISCOVERY',
+      checks: '`playwright test --list` contains the new tests with their declared tags',
+      executionCapable: true,
+      implementation: `${VAL}/discovery-guard.ts`,
+      tests: {
+        text: 'discovery-guard.test.ts',
+        evidence: [
+          {
+            path: `${VAL}/discovery-guard.test.ts`,
+            quote: "describe('G-DISCOVERY: real Playwright listing'",
+          },
+        ],
+      },
+    },
+    {
+      id: 'G-RUN',
+      checks:
+        'Targeted run of the proposed test files, filtered by their declared `@TC-…` tags; the full suite when any `support-change` is present; "no tests to run" when there are neither test nor support changes',
+      executionCapable: true,
+      implementation: `${VAL}/run-guard.ts`,
+      tests: {
+        text: 'run-guard.test.ts',
+        evidence: [
+          { path: `${VAL}/run-guard.test.ts`, quote: "describe('G-RUN: real runs with the AUT'" },
+        ],
+      },
+    },
+  ],
+  gates: [
+    {
+      id: 'H1',
+      requires: 'Test-plan changes, including provisional TC IDs (Planner)',
+      here: {
+        text: 'Not reachable: the Planner is not implemented.',
+        evidence: notImplemented('planner', 'Planner'),
+      },
+    },
+    {
+      id: 'H2',
+      requires: 'Generated test and support changes, after validation (Generator)',
+      here: {
+        text: 'No apply workflow exists: a proposal reaches tests/ only as an ordinary, reviewed commit by a human.',
+        evidence: [
+          { path: README, quote: '- [ ] Proposal approval and apply workflow' },
+          {
+            path: GENERATOR_DOC,
+            quote: 'applying it to `tests/` remains a manual, reviewed commit.',
+          },
+        ],
+      },
+    },
+    {
+      id: 'H3',
+      requires: 'Healing patches, after validation (Healer)',
+      here: {
+        text: 'Not reachable: the Healer is not implemented.',
+        evidence: notImplemented('healer', 'Healer'),
+      },
+    },
+    {
+      id: 'H4',
+      requires: 'Requirements changes — humans only; agents may only raise findings',
+      here: {
+        text: 'Humans only: requirements are a Protected path, which G-PATHS denies to every agent.',
+        evidence: [
+          { path: STANDARD, quote: '| Protected | `specs/**/requirements.md`;' },
+          { path: STANDARD, quote: '| None. Humans only, by normal PRs. |' },
+        ],
+      },
+    },
+    {
+      id: 'H5',
+      requires: 'Creating, changing or promoting a canonical test — humans only',
+      here: {
+        text: 'Humans only: files with a canonical test are Protected, and G-TRACE rejects an agent-added @CAN tag.',
+        evidence: [
+          { path: STANDARD, quote: 'any file containing a `@CAN-` test;' },
+          {
+            path: STANDARD,
+            quote:
+              'Agents never add a `@CAN-…` tag; only a human makes a test canonical (gate H5).',
+          },
+        ],
+      },
+    },
+    {
+      id: 'H6',
+      requires: 'Changes to this standard, agent definitions or ADRs — humans only',
+      here: {
+        text: 'Humans only: agents/** and docs/adr/** are Protected paths.',
+        evidence: [{ path: STANDARD, quote: '`.env*`; `agents/**`; `docs/adr/**` |' }],
+      },
+    },
+    {
+      id: 'H7',
+      requires:
+        'Execution authorization: before any execution-capable guard runs proposed code for validation (STD-AUTH-005)',
+      here: {
+        text: 'Closed. Enforced by the validator: no authorization is stored in the repository, and CI never authorizes execution.',
+        evidence: [
+          {
+            path: `${VAL}/validate.ts`,
+            quote:
+              '// Execution boundary (gate H7): nothing below runs proposed code without authorization.',
+          },
+          { path: CI, excludes: '--authorize-execution' },
+        ],
+      },
+    },
+  ],
+  modelExecution: {
+    h7: {
+      text: 'No execution authorization is in effect: none is stored in this repository, and CI never grants one. Without one, the validator runs no guard that executes proposed code. An authorization is given by a human, on the command line, for one exact artifact SHA-256, and is never read from the artifact or the environment. The documented offline demonstration did not open H7 for current use.',
+      evidence: [
+        {
+          path: STANDARD,
+          quote: 'bound to the exact artifact bytes: the SHA-256 of the raw artifact file.',
+        },
+        {
+          path: STANDARD,
+          quote: 'it is never read from the artifact or from environment variables.',
+        },
+        {
+          path: STANDARD,
+          quote: 'a persistent record of execution authorizations (who authorized what, and when).',
+        },
+        { path: CI, excludes: '--authorize-execution' },
+      ],
+    },
+    liveModeInCode: {
+      text: 'The Generator has a live mode in code: run locally by a human, npm run agents:generate makes one Anthropic API call, with credentials from that person’s environment. It is never run in CI or by this dashboard.',
+      evidence: [
+        {
+          path: `${GEN}/model-client.ts`,
+          quote: 'export function createAnthropicModelClient(): ModelClient {',
+        },
+        {
+          path: `${GEN}/model-client.ts`,
+          quote: 'Credentials are resolved by the SDK from the environment',
+        },
+        {
+          path: GENERATOR_DOC,
+          quote: 'npm run agents:generate -- --tc TC-003-07 # live: calls the model',
+        },
+        { path: CI, excludes: 'agents:generate' },
+      ],
+    },
+    ci: {
+      text: 'CI forbids model credentials and staged proposals: the run fails if a model API key is set or artifacts/proposals exists.',
+      evidence: [
+        { path: CI, quote: '- name: Guard (no model credentials, no staged proposals)' },
+        { path: CI, quote: 'must not be set in CI"' },
+        { path: CI, quote: 'echo "::error::staged AI proposals must not exist in CI"' },
+      ],
+    },
+    fakeModelTests: {
+      text: 'The agent suite in CI (Agent validation and generator tests) runs the validator’s deterministic tests and the Generator’s tests with a fake model.',
+      evidence: [
+        { path: CI, quote: '- name: Agent validation and generator tests' },
+        { path: CI, quote: 'npm run --silent agents:test | tee artifacts/ci/agents.tap' },
+        {
+          path: `${GEN}/generator.test.ts`,
+          quote: 'The model is always a fake; no provider is contacted.',
+        },
+      ],
+    },
+    liveRuns: {
+      text: 'No live AI model run is recorded. The repository states that no live model call has been made yet, so the quality of real model output is unverified.',
+      evidence: [
+        {
+          path: GENERATOR_DOC,
+          quote: 'No live model call has been made yet; real-model output quality is unverified.',
+        },
+        { path: README, quote: '- [ ] A live Generator run (real model output)' },
+      ],
+    },
+    offlineDemo: {
+      text: 'The Generator documentation records one historical offline demonstration. A hand-written test fixture, not model output, was given to the Generator as a recorded output instead of a model call. A human then authorized execution under H7 for that one exact artifact, by its SHA-256, in a local validator run, and all seven guards passed. It was not a live AI model run, and it did not open H7: an authorization is given on the command line for one validator run of one exact artifact, is never stored, and is not in effect now. Its evidence is a local, gitignored record that is not part of this dashboard.',
+      evidence: [
+        { path: GENERATOR_DOC, quote: 'The demo test is a **hand-written fixture**' },
+        { path: GENERATOR_DOC, quote: 'It was passed to the Generator with `--fake-model-output`' },
+        {
+          path: GENERATOR_DOC,
+          quote: 'A human authorizes execution of one exact artifact by its SHA-256:',
+        },
+        { path: GENERATOR_DOC, quote: 'with human H7 authorization: **all seven guards passed**' },
+        { path: `${VAL}/cli.ts`, quote: 'the SHA-256 of the exact artifact bytes, given on the' },
+        { path: STANDARD, quote: 'Any change to the artifact invalidates the authorization.' },
+        {
+          path: STANDARD,
+          quote: 'a persistent record of execution authorizations (who authorized what, and when).',
+        },
+        { path: CI, excludes: '--authorize-execution' },
+        {
+          path: GENERATOR_DOC,
+          quote:
+            'The demo proves the pipeline and its boundaries; it says nothing about the quality of real model output.',
+        },
+      ],
+    },
+  },
+  notRecorded: [
+    {
+      text: 'Agent execution history: no agent run is recorded in the repository or in the published CI history.',
+      evidence: [
+        {
+          path: GENERATOR_DOC,
+          quote: 'The validator CLI prints its result but writes no persistent pipeline record;',
+        },
+        { path: CI, excludes: 'agents:generate' },
+      ],
+    },
+    {
+      text: 'Model usage, tokens and costs: no live model call has been made, and none is measured.',
+      evidence: [{ path: GENERATOR_DOC, quote: 'No live model call has been made yet' }],
+    },
+    {
+      text: 'AI-generated proposals: proposals are staged locally under the gitignored artifacts/ folder, are not in the repository and are never shown here.',
+      evidence: [
+        { path: '.gitignore', quote: 'artifacts/*' },
+        { path: CI, quote: 'echo "::error::staged AI proposals must not exist in CI"' },
+      ],
+    },
+    {
+      text: 'Approval events: who authorized or approved what, and when, is not recorded. The standard defers a persistent record of execution authorizations.',
+      evidence: [
+        {
+          path: STANDARD,
+          quote: 'a persistent record of execution authorizations (who authorized what, and when).',
+        },
+        { path: GENERATOR_DOC, quote: 'Authorizations are not audited.' },
+      ],
+    },
+    {
+      text: 'Live AI success rates: with no live runs, there is nothing to measure.',
+      evidence: [{ path: README, quote: '- [ ] A live Generator run (real model output)' }],
+    },
+  ],
+  defectCandidates: {
+    text: 'When the application contradicts a requirement, an agent records a defect-candidate finding in its proposal. It is a finding for human triage, not a defect.',
+    evidence: [
+      {
+        path: STANDARD,
+        quote:
+          'When the application contradicts a requirement, record a `defect-candidate` finding. Never change an expected result to match the application.',
+      },
+      { path: 'agents/standard/envelope.schema.json', quote: '"defect-candidate"' },
+    ],
+  },
+};
+
+/** Every evidence item in the layer, including the guard and gate rows of the standard's tables. */
+export function allEvidence(layer: AgentLayer): Evidence[] {
+  const facts: Fact[] = [
+    layer.standard,
+    layer.principle,
+    layer.agentRoles,
+    ...layer.components.flatMap((c) => [
+      c.purpose,
+      ...c.responsibilities,
+      c.code,
+      c.tests,
+      c.approval,
+    ]),
+    ...layer.guards.map((g) => g.tests),
+    ...layer.gates.map((g) => g.here),
+    ...Object.values(layer.modelExecution),
+    ...layer.notRecorded,
+    layer.defectCandidates,
+  ];
+  return [
+    ...facts.flatMap((fact) => fact.evidence),
+    ...layer.guards.flatMap((g): Evidence[] => [
+      {
+        path: STANDARD,
+        quote: `| ${g.id} | ${g.checks} | ${g.executionCapable ? '**Yes**' : 'No'} |`,
+      },
+      { path: g.implementation, tracked: true },
+    ]),
+    ...layer.gates.map((g): Evidence => ({ path: STANDARD, quote: `| ${g.id} | ${g.requires} |` })),
+  ];
+}
+
+/** The distinct committed files the evidence refers to, sorted. */
+export function evidencePaths(layer: AgentLayer): string[] {
+  return [
+    ...new Set(
+      allEvidence(layer)
+        .filter((e) => !('absent' in e))
+        .map((e) => e.path),
+    ),
+  ].sort();
+}
+
+/** The distinct paths checked to have no committed files, sorted. */
+export function absentPaths(layer: AgentLayer): string[] {
+  return [
+    ...new Set(
+      allEvidence(layer)
+        .filter((e) => 'absent' in e)
+        .map((e) => e.path),
+    ),
+  ].sort();
+}

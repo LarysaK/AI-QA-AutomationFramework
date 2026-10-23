@@ -281,24 +281,28 @@ describe('Test Plan', () => {
   });
 });
 
-describe('Navigation and placeholders', () => {
-  test('placeholders say the integration is not connected', async () => {
-    for (const [path, title] of [
-      ['#/ai-agents', 'AI Agents'],
-      ['#/defects', 'Defects'],
+describe('Navigation', () => {
+  test('AI Agents and Defects are ordinary pages: no placeholder, no "Not connected" tag', async () => {
+    await renderAt('#/');
+    const nav = within(screen.getByRole('navigation', { name: 'Primary' }));
+    expect(nav.queryByText('Not connected')).toBeNull();
+    expect(nav.queryByText('Not available yet')).toBeNull();
+    for (const [name, hash] of [
+      ['AI Agents', '#/ai-agents'],
+      ['Defects', '#/defects'],
     ] as const) {
-      const { unmount } = await renderAt(path);
-      expect(screen.getByRole('heading', { level: 1, name: title })).toBeTruthy();
-      expect(screen.getByText('This integration is not connected')).toBeTruthy();
-      unmount();
+      await go(hash);
+      expect(nav.getByRole('link', { name }).getAttribute('aria-current')).toBe('page');
+      expect(screen.getByRole('heading', { level: 1, name })).toBeTruthy();
+      expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1 }));
+      expect(screen.queryByText('This integration is not connected')).toBeNull();
     }
   });
 
-  test('the active page is marked, unavailable pages are tagged, and focus moves to the new page', async () => {
+  test('the active page is marked and focus moves to the new page', async () => {
     await renderAt('#/');
     const nav = within(screen.getByRole('navigation', { name: 'Primary' }));
     expect(nav.getByRole('link', { name: 'Overview' }).getAttribute('aria-current')).toBe('page');
-    expect(nav.getAllByText('Not connected')).toHaveLength(2);
     await go('#/test-plan');
     expect(nav.getByRole('link', { name: 'Test Plan' }).getAttribute('aria-current')).toBe('page');
     expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1 }));

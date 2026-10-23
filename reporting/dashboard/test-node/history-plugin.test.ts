@@ -9,6 +9,7 @@ import { afterAll, describe, expect, test } from 'vitest';
 
 import { SUITE_STEPS } from '../../ci/collect';
 import { validateExport } from '../../ci/history-export';
+import { verifiedAgentLayer } from '../build/agent-layer-plugin';
 import { validatedHistory } from '../build/history-plugin';
 import { validatedSnapshot } from '../build/snapshot-plugin';
 import { SUITES } from '../src/data/history';
@@ -47,6 +48,7 @@ async function buildWith(history: unknown, required = false): Promise<string> {
       react(),
       validatedSnapshot({ snapshotFile: SNAPSHOT, repoRoot: REPO_ROOT }),
       validatedHistory({ historyFile, repoRoot: REPO_ROOT, required }),
+      verifiedAgentLayer({ repoRoot: REPO_ROOT }),
     ],
     build: { outDir, emptyOutDir: true },
   });
