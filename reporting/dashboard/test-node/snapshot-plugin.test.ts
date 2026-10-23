@@ -8,6 +8,7 @@ import { build } from 'vite';
 import { afterAll, describe, expect, test } from 'vitest';
 
 import { validateSnapshot } from '../../dashboard-data/validate';
+import { validatedHistory } from '../build/history-plugin';
 import { validatedSnapshot } from '../build/snapshot-plugin';
 
 /**
@@ -42,7 +43,16 @@ async function buildWith(snapshot: unknown): Promise<string> {
     root: DASHBOARD,
     configFile: false,
     logLevel: 'silent',
-    plugins: [react(), validatedSnapshot({ snapshotFile, repoRoot: REPO_ROOT })],
+    plugins: [
+      react(),
+      validatedSnapshot({ snapshotFile, repoRoot: REPO_ROOT }),
+      // No CI history export in these builds (embedded as null); see history-plugin.test.ts.
+      validatedHistory({
+        historyFile: join(dir, 'no-ci-history.json'),
+        repoRoot: REPO_ROOT,
+        required: false,
+      }),
+    ],
     build: { outDir, emptyOutDir: true },
   });
   return outDir;

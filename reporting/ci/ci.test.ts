@@ -28,6 +28,7 @@ import { contextToEnvironment } from './context';
 import './context.test';
 import { RUN_2_CONTEXT } from './context.test';
 import './handoff.test';
+import './history-export.test';
 import './history.test';
 import './publish.test';
 import './reconcile.test';

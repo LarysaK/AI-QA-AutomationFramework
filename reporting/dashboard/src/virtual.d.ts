@@ -3,3 +3,9 @@ declare module 'virtual:dashboard-snapshot' {
   const snapshot: unknown;
   export default snapshot;
 }
+
+declare module 'virtual:ci-history' {
+  /** The CI execution history export, validated at build time; null when not included. */
+  const history: unknown;
+  export default history;
+}

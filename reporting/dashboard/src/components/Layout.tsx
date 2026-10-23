@@ -15,7 +15,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { path: '/', label: 'Overview' },
   { path: '/test-plan', label: 'Test Plan' },
   { path: '/test-cases', label: 'Test Cases' },
-  { path: '/executions', label: 'Executions', unavailable: true },
+  { path: '/executions', label: 'Executions' },
   { path: '/ai-agents', label: 'AI Agents', unavailable: true },
   { path: '/defects', label: 'Defects', unavailable: true },
   { path: '/how-to-read', label: 'How to read this dashboard' },

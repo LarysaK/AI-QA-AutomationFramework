@@ -1,8 +1,9 @@
 # RequestFlow QA Dashboard
 
-A read-only, static React site that renders one input: the validated dashboard snapshot built
-from the approved requirements, the approved test plan and the committed Playwright tests. It
-has no backend and makes no network requests.
+A read-only, static React site that renders two build-time inputs: the validated dashboard
+snapshot built from the approved requirements, the approved test plan and the committed
+Playwright tests, and, optionally, the published CI execution history exported from the
+`ci-history` branch. It has no backend and makes no network requests.
 
 ## Build prerequisites and order
 
@@ -13,6 +14,7 @@ project's snapshot validator. Run, from the repository root:
 ```bash
 npm ci                                   # 1. root install (Playwright, Ajv 8, tsx, @types/node)
 npm run dashboard:data                   # 2. writes artifacts/dashboard/dashboard-data.json
+npm run dashboard:history -- --history <checkout of ci-history>   # optional, see below
 npm --prefix reporting/dashboard ci      # 3. dashboard install (React, Vite, Vitest, ESLint)
 npm --prefix reporting/dashboard run build   # 4. writes artifacts/dashboard-site/
 ```
@@ -45,6 +47,37 @@ keeps the snapshot's `source.commit` accurate. It is a git-based gate, not a san
 
 Commit (or stash) changes to those paths first. `npm run dashboard:test` fails for the same
 reason while they are uncommitted.
+
+## CI execution history (optional)
+
+The Executions page, the Overview's execution figures and the per-test-case CI result come from
+`artifacts/dashboard/ci-history.json`, written by:
+
+```bash
+git clone --branch ci-history https://github.com/LarysaK/AI-QA-AutomationFramework.git ../ci-history
+# optional: coverage of unpublished CI runs (read-only GitHub API requests)
+npx tsx reporting/ci/reconcile-cli.ts --history ../ci-history > ../reconciliation.json
+npm run dashboard:history -- --history ../ci-history --reconciliation ../reconciliation.json
+```
+
+- **Read-only and verified.** The exporter reads a git checkout of `ci-history`, refuses to
+  write anything unless the history passes the full schema and public-safety validation and the
+  immutability audit of its git log, and writes only the output file. A reconciliation report is
+  accepted only for the same `ci-history` commit with integrity verified.
+- **Build-time snapshot.** The page names the `ci-history` commit and its commit time, and says
+  it does not update live. New runs appear only after the export and the build are run again.
+- **Missing export.** The build embeds `null` and the page says the history is not included in
+  this build (never that no CI runs exist). `DASHBOARD_REQUIRE_CI_HISTORY=1` makes a missing
+  export fail the build instead; an invalid or unsafe export always fails it.
+- **Published records only.** "Published CI runs" counts records. Unpublished eligible attempts
+  are listed separately and are never shown as failed; coverage that was not checked or is
+  undetermined is stated as such.
+- **Results and test cases.** A Playwright result is related to a test case only when the run
+  tested exactly the snapshot's commit with the snapshot's Playwright version, its
+  (instance ID, project) is reported once, exactly one committed instance has that ID and project,
+  and the test case's `@TC` tag and the snapshot's linkage agree. Otherwise the result is listed
+  by instance ID, marked unmatched or ambiguous. Suite counts are never turned into per-test-case
+  results, and titles are never compared.
 
 ## What the build checks
 

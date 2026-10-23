@@ -7,10 +7,24 @@ import {
   requirementLinkage,
   shortSha,
 } from '../data/derive';
+import {
+  CONCLUSION_LABEL,
+  type ExecutionHistory,
+  formatInstant,
+  runPath,
+  testTotals,
+} from '../data/history';
 import type { Snapshot } from '../data/types';
 import { href } from '../router';
 
-export function Overview({ snapshot }: { snapshot: Snapshot }) {
+export function Overview({
+  snapshot,
+  history,
+}: {
+  snapshot: Snapshot;
+  history: ExecutionHistory | null;
+}) {
+  const latest = history?.records[0];
   const s = snapshot.summary;
   const intended = s.testCasesByAutomationIntent.Yes;
   const manualOnly = s.testCasesByAutomationIntent.No;
@@ -59,7 +73,24 @@ export function Overview({ snapshot }: { snapshot: Snapshot }) {
           value={String(s.testInstances)}
           detail={`Discovered by Playwright ${snapshot.source.discovery.playwrightVersion}`}
         />
-        <Stat label="CI runs" value="None yet" detail="No CI runs yet" tone="muted" />
+        {history === null ? (
+          <Stat
+            label="Published CI runs"
+            value="Not included"
+            detail="Execution history is not part of this build"
+            tone="muted"
+          />
+        ) : (
+          <Stat
+            label="Published CI runs"
+            value={String(history.records.length)}
+            detail={
+              latest === undefined
+                ? 'No records on the ci-history branch yet'
+                : `Latest #${String(latest.run.number)} · ${CONCLUSION_LABEL[latest.conclusion]}`
+            }
+          />
+        )}
       </dl>
 
       <div className="grid-2">
@@ -91,7 +122,9 @@ export function Overview({ snapshot }: { snapshot: Snapshot }) {
             />
             <div className="meter-row meter-row-empty">
               <span className="meter-label">Executed in CI</span>
-              <span className="meter-empty">No CI runs yet</span>
+              <span className="meter-empty">
+                Not measured per test case (<a href={href('/executions')}>see Executions</a>)
+              </span>
               <span className="meter-text">—</span>
             </div>
           </div>
@@ -192,13 +225,40 @@ export function Overview({ snapshot }: { snapshot: Snapshot }) {
       </Card>
 
       <Card title="Execution results">
-        <Callout title="No CI runs yet" tone="empty">
-          <p>
-            Continuous integration is not connected, so there is no execution history to show. Local
-            Playwright runs are deliberately not published as results. This section will show real
-            CI runs, each linked to its commit and workflow run, once they exist.
-          </p>
-        </Callout>
+        {history === null ? (
+          <Callout title="Execution history is not included in this build" tone="empty">
+            <p>
+              Published CI runs are kept on the <code>ci-history</code> branch; this build was made
+              without them. That does not mean no CI runs exist. Local Playwright runs are never
+              published as results.
+            </p>
+          </Callout>
+        ) : latest === undefined ? (
+          <Callout title="No published CI runs yet" tone="empty">
+            <p>
+              The <code>ci-history</code> branch has no run records yet. Local Playwright runs are
+              never published as results.
+            </p>
+          </Callout>
+        ) : (
+          <>
+            <p>
+              Latest published CI run:{' '}
+              <a href={href(runPath(latest))}>#{String(latest.run.number)}</a>,{' '}
+              {CONCLUSION_LABEL[latest.conclusion].toLowerCase()}, completed{' '}
+              {formatInstant(latest.timestamps.jobCompletedAt)} on commit{' '}
+              <code>{shortSha(latest.commitSha)}</code>: {String(testTotals(latest).passed)} of{' '}
+              {String(testTotals(latest).total)} tests passed across {String(latest.suites.length)}{' '}
+              CI test suites.
+            </p>
+            <p className="fine-print">
+              {String(history.records.length)} published run
+              {history.records.length === 1 ? '' : 's'} from the <code>ci-history</code> branch at{' '}
+              <code>{shortSha(history.source.commit)}</code>, as of when this dashboard was built.{' '}
+              {coverageSentence(history)} <a href={href('/executions')}>All executions</a>
+            </p>
+          </>
+        )}
       </Card>
     </>
   );
@@ -209,4 +269,24 @@ function requirementsVersion(snapshot: Snapshot): string {
     document.path.endsWith('/requirements.md'),
   )?.title;
   return /v\d+(\.\d+)*/.exec(title ?? '')?.[0] ?? '';
+}
+
+/**
+ * Coverage, kept apart from the published-record count: published records, unpublished eligible
+ * attempts (never failures) and unknown or unverified coverage are each stated as such.
+ */
+function coverageSentence(history: ExecutionHistory): string {
+  const coverage = history.coverage;
+  if (coverage === null) return 'Coverage of unpublished CI runs was not checked for this build.';
+  const incomplete = coverage.listingComplete
+    ? ''
+    : ' The runs listing was incomplete, so other runs may be missing too.';
+  if (coverage.verdict === 'complete') {
+    return 'Every eligible CI run attempt that GitHub Actions listed is published.';
+  }
+  if (coverage.verdict === 'undetermined') {
+    return `No unpublished eligible run attempt is known, but coverage is undetermined.${incomplete}`;
+  }
+  const n = coverage.missingAttempts;
+  return `${String(n)} eligible run attempt${n === 1 ? ' has' : 's have'} no published record; that does not mean ${n === 1 ? 'it' : 'they'} failed.${incomplete}`;
 }

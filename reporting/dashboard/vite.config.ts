@@ -4,16 +4,20 @@ import react from '@vitejs/plugin-react';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
+import { validatedHistory } from './build/history-plugin';
 import { validatedSnapshot } from './build/snapshot-plugin';
 
 /**
- * The dashboard renders exactly one input: the snapshot written by `npm run dashboard:data`,
- * schema-validated and safety-scanned by the snapshot plugin before it is embedded. Nothing else
- * from the repository or `artifacts/` reaches the browser.
+ * The dashboard renders two build-time inputs, each validated and safety-scanned in Node before it
+ * is embedded: the snapshot written by `npm run dashboard:data` (approved requirements, test plan,
+ * test cases, committed tests), and, when present, the CI execution history exported from the
+ * ci-history branch by `reporting/ci/history-export-cli.ts`. Nothing else from the repository or
+ * `artifacts/` reaches the browser, and the browser fetches nothing.
  */
 
 const REPO_ROOT = resolve(import.meta.dirname, '../..');
 const SNAPSHOT_FILE = resolve(REPO_ROOT, 'artifacts/dashboard/dashboard-data.json');
+const HISTORY_FILE = resolve(REPO_ROOT, 'artifacts/dashboard/ci-history.json');
 
 /**
  * Production pages get a strict Content-Security-Policy: same-origin scripts and styles only, no
@@ -54,6 +58,7 @@ export default defineConfig({
   plugins: [
     react(),
     validatedSnapshot({ snapshotFile: SNAPSHOT_FILE, repoRoot: REPO_ROOT }),
+    validatedHistory({ historyFile: HISTORY_FILE, repoRoot: REPO_ROOT }),
     contentSecurityPolicy(),
   ],
   // Relative asset URLs, so the static build works from any sub-path.

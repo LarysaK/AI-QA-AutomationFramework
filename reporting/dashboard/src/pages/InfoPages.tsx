@@ -1,17 +1,25 @@
 import { Callout, Card, PageHeader } from '../components/ui';
 import { shortSha } from '../data/derive';
+import { type ExecutionHistory, formatInstant } from '../data/history';
 import type { Snapshot } from '../data/types';
 import { href } from '../router';
 
-export function HowToRead({ snapshot }: { snapshot: Snapshot }) {
+export function HowToRead({
+  snapshot,
+  history = null,
+}: {
+  snapshot: Snapshot;
+  history?: ExecutionHistory | null;
+}) {
   const { source, summary } = snapshot;
   const coverage = `${String(summary.linkedTestCasesWithIntentYes)} of ${String(summary.testCasesByAutomationIntent.Yes)}`;
   return (
     <>
       <PageHeader eyebrow="Definitions" title="How to read this dashboard">
         <p>
-          Every figure comes from one validated snapshot. Four measures are kept apart, because each
-          one says less than it may seem to.
+          Every figure comes from validated build-time data: the snapshot of the approved documents
+          and committed tests, and, when included, the published CI history. Four measures are kept
+          apart, because each one says less than it may seem to.
         </p>
       </PageHeader>
 
@@ -45,9 +53,11 @@ export function HowToRead({ snapshot }: { snapshot: Snapshot }) {
           <div>
             <dt>Executed in CI</dt>
             <dd>
-              A pass or fail recorded by a CI run for a specific commit.{' '}
-              <strong>No CI runs exist yet</strong>, so the dashboard shows no results. Local runs
-              are not published as results.
+              A result recorded by a published CI run for a specific commit. Suite counts are per
+              suite, not per test case. A test case shows a CI result only when a published run
+              tested this dashboard’s snapshot commit, from the results of exactly its linked test
+              instances. A CI run without a published record is not a failed run. Local runs are
+              never published as results.
             </dd>
           </div>
         </dl>
@@ -87,6 +97,21 @@ export function HowToRead({ snapshot }: { snapshot: Snapshot }) {
             <dt>Snapshot schema</dt>
             <dd>{snapshot.schemaVersion}</dd>
           </div>
+          <div className="meta-row">
+            <dt>CI execution history</dt>
+            <dd>
+              {history === null ? (
+                'Not included in this build'
+              ) : (
+                <>
+                  <code>ci-history</code> branch at <code>{history.source.commit}</code>, last
+                  updated {formatInstant(history.source.committedAt)};{' '}
+                  {String(history.source.records)} published run record
+                  {history.source.records === 1 ? '' : 's'}; a build-time snapshot, not live
+                </>
+              )}
+            </dd>
+          </div>
         </dl>
         <p className="fine-print">
           The snapshot is built only when the approved documents, the tests and everything
@@ -104,7 +129,11 @@ export function HowToRead({ snapshot }: { snapshot: Snapshot }) {
             AI-generated test proposals or their code, which stay outside the repository until a
             human applies them.
           </li>
-          <li>Execution history that does not exist.</li>
+          <li>
+            Execution history that was not published: no CI run is invented, and no unpublished run
+            is counted as passed or failed.
+          </li>
+          <li>Live AI model activity: the agent suite in CI is tested with a fake model.</li>
         </ul>
       </Card>
     </>
@@ -112,10 +141,6 @@ export function HowToRead({ snapshot }: { snapshot: Snapshot }) {
 }
 
 const UNAVAILABLE = {
-  executions: {
-    title: 'Executions',
-    body: 'CI is not connected yet. When it is, this page will list real CI runs, each with its commit, workflow run and per-test results. Until then there is nothing to show, and local runs are not published.',
-  },
   'ai-agents': {
     title: 'AI Agents',
     body: 'The agent layer (a Generator agent, a deterministic validator and human approval gates) exists in the repository, but its activity is not exported to this dashboard yet. Proposals will only be shown from a reviewed, sanitized export, and never their code.',
