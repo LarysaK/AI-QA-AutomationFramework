@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import snapshotData from 'virtual:dashboard-snapshot';
 import { describe, expect, test } from 'vitest';
 
@@ -9,16 +9,30 @@ import type { Snapshot } from '../src/data/types';
 const snapshot = snapshotData as Snapshot;
 const { summary } = snapshot;
 
-function go(hash: string): void {
+/** Waits until the routed page has rendered (lazy pages load their code first). */
+async function ready(): Promise<void> {
+  await waitFor(() => {
+    expect(document.querySelector('.page-loading')).toBeNull();
+    expect(document.querySelector('#main h1')).not.toBeNull();
+  });
+}
+
+async function go(hash: string): Promise<void> {
   act(() => {
     window.history.replaceState(null, '', hash);
     window.dispatchEvent(new HashChangeEvent('hashchange'));
   });
+  await ready();
 }
 
-function renderAt(hash: string) {
-  go(hash);
-  return render(<App snapshot={snapshot} />);
+async function renderAt(hash: string) {
+  act(() => {
+    window.history.replaceState(null, '', hash);
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  });
+  const result = render(<App snapshot={snapshot} />);
+  await ready();
+  return result;
 }
 
 function testCaseRows(): HTMLElement[] {
@@ -27,8 +41,8 @@ function testCaseRows(): HTMLElement[] {
 }
 
 describe('Overview', () => {
-  test('shows the real counts, linked coverage of intended test cases and no CI results', () => {
-    renderAt('#/');
+  test('shows the real counts and linked coverage; without CI history it says so, never "no CI runs"', async () => {
+    await renderAt('#/');
     expect(screen.getByRole('heading', { level: 1, name: 'Overview' })).toBeTruthy();
     const key = within(screen.getByLabelText('Key figures'));
     expect(key.getByText(String(summary.requirements))).toBeTruthy();
@@ -38,11 +52,13 @@ describe('Overview', () => {
         `${String(summary.linkedTestCasesWithIntentYes)} of ${String(summary.testCasesByAutomationIntent.Yes)}`,
       ),
     ).toBeTruthy();
-    expect(screen.getAllByText('No CI runs yet').length).toBeGreaterThan(0);
+    expect(key.getByText('Not included')).toBeTruthy();
+    expect(screen.getByText('Execution history is not included in this build')).toBeTruthy();
+    expect(screen.queryByText(/No CI runs/)).toBeNull();
   });
 
-  test('every requirement shows "n of m test cases linked", never a bare linked/unlinked label', () => {
-    renderAt('#/');
+  test('every requirement shows "n of m test cases linked", never a bare linked/unlinked label', async () => {
+    await renderAt('#/');
     const table = within(screen.getByRole('region', { name: 'Linkage by requirement' }));
     const rows = table.getAllByRole('row').slice(1);
     expect(rows).toHaveLength(snapshot.requirements.length);
@@ -57,8 +73,8 @@ describe('Overview', () => {
 });
 
 describe('Meters', () => {
-  test('each bar is announced once: named by its label, valued by its text', () => {
-    renderAt('#/');
+  test('each bar is announced once: named by its label, valued by its text', async () => {
+    await renderAt('#/');
     const rows = [...document.querySelectorAll('.meter-row')].filter((row) =>
       row.querySelector('meter'),
     );
@@ -81,8 +97,8 @@ describe('Meters', () => {
     );
   });
 
-  test('the decorative bars in the requirement table are hidden; their label is the text', () => {
-    renderAt('#/');
+  test('the decorative bars in the requirement table are hidden; their label is the text', async () => {
+    await renderAt('#/');
     const table = screen.getByRole('region', { name: 'Linkage by requirement' });
     for (const meter of table.querySelectorAll('meter'))
       expect(meter.getAttribute('aria-hidden')).toBe('true');
@@ -90,16 +106,16 @@ describe('Meters', () => {
 });
 
 describe('Test Case Explorer', () => {
-  test('lists all approved test cases', () => {
-    renderAt('#/test-cases');
+  test('lists all approved test cases', async () => {
+    await renderAt('#/test-cases');
     expect(testCaseRows()).toHaveLength(summary.testCases);
     expect(screen.getByRole('status').textContent).toBe(
       `Showing ${String(summary.testCases)} of ${String(summary.testCases)} test cases`,
     );
   });
 
-  test('searches by ID and by scenario text', () => {
-    renderAt('#/test-cases');
+  test('searches by ID and by scenario text', async () => {
+    await renderAt('#/test-cases');
     const search = screen.getByRole('searchbox', { name: 'Search ID or scenario' });
     fireEvent.change(search, { target: { value: 'TC-003-07' } });
     expect(testCaseRows().map((row) => row.querySelector('th')?.textContent)).toEqual([
@@ -115,8 +131,8 @@ describe('Test Case Explorer', () => {
     );
   });
 
-  test('filters by requirement, level, priority, intent and linkage, and clears', () => {
-    renderAt('#/test-cases');
+  test('filters by requirement, level, priority, intent and linkage, and clears', async () => {
+    await renderAt('#/test-cases');
     const choose = (label: string, value: string) => {
       fireEvent.change(screen.getByRole('combobox', { name: label }), { target: { value } });
     };
@@ -137,8 +153,8 @@ describe('Test Case Explorer', () => {
     expect(testCaseRows()).toHaveLength(summary.testCases);
   });
 
-  test('filters are kept in the URL', () => {
-    renderAt('#/test-cases?level=UI&linkage=not-linked');
+  test('filters are kept in the URL', async () => {
+    await renderAt('#/test-cases?level=UI&linkage=not-linked');
     const expected = snapshot.testCases.filter(
       (tc) => tc.level === 'UI' && tc.automationLinkage.status === 'not-linked',
     ).length;
@@ -147,10 +163,10 @@ describe('Test Case Explorer', () => {
 });
 
 describe('Test case details', () => {
-  test('every approved test case has a detail page with its exact scenario', () => {
-    renderAt('#/test-cases');
+  test('every approved test case has a detail page with its exact scenario', async () => {
+    await renderAt('#/test-cases');
     for (const tc of snapshot.testCases) {
-      go(`#/test-cases/${tc.id}`);
+      await go(`#/test-cases/${tc.id}`);
       expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(tc.id);
       expect(document.querySelector('.source-text pre code')?.textContent).toBe(tc.scenario);
       const requirement = snapshot.requirements.find((r) => r.id === tc.requirementId);
@@ -165,10 +181,10 @@ describe('Test case details', () => {
     }
   });
 
-  test('a linked test case lists its committed instances, the linkage caveat and no execution result', () => {
+  test('a linked test case lists its committed instances and the linkage caveat; no CI history here', async () => {
     const tc = snapshot.testCases.find((t) => t.automationLinkage.status === 'linked');
     expect(tc).toBeDefined();
-    renderAt(`#/test-cases/${tc?.id ?? ''}`);
+    await renderAt(`#/test-cases/${tc?.id ?? ''}`);
     const instance = snapshot.testInstances.find(
       (i) => i.id === tc?.automationLinkage.testInstanceIds[0],
     );
@@ -176,11 +192,11 @@ describe('Test case details', () => {
       screen.getByText(`${instance?.file ?? ''}:${String(instance?.line ?? '')}`),
     ).toBeTruthy();
     expect(screen.getByText('Linkage is not full coverage')).toBeTruthy();
-    expect(screen.getByText('No CI runs yet')).toBeTruthy();
+    expect(screen.getByText('Execution history is not included in this build')).toBeTruthy();
   });
 
-  test('an unknown test case is reported, not invented', () => {
-    renderAt('#/test-cases/TC-999-99');
+  test('an unknown test case is reported, not invented', async () => {
+    await renderAt('#/test-cases/TC-999-99');
     expect(screen.getByRole('heading', { level: 1, name: 'Test case not found' })).toBeTruthy();
   });
 });
@@ -188,11 +204,11 @@ describe('Test case details', () => {
 describe('Automation intent: No', () => {
   const notAutomated = snapshot.testCases.filter((tc) => tc.automationIntent === 'No');
 
-  test('each such test case links to the plan sections that name it, and nothing else', () => {
+  test('each such test case links to the plan sections that name it, and nothing else', async () => {
     expect(notAutomated.length).toBe(summary.testCasesByAutomationIntent.No);
-    renderAt('#/');
+    await renderAt('#/');
     for (const tc of notAutomated) {
-      go(`#/test-cases/${tc.id}`);
+      await go(`#/test-cases/${tc.id}`);
       const naming = snapshot.testPlan.sections.filter(
         (section) =>
           (section.kind === 'text' && section.markdown.includes(tc.id)) ||
@@ -206,20 +222,20 @@ describe('Automation intent: No', () => {
     }
   });
 
-  test('the plan link opens the named section, not the top of the plan', () => {
+  test('the plan link opens the named section, not the top of the plan', async () => {
     const tc = notAutomated[0];
-    renderAt(`#/test-cases/${tc?.id ?? ''}`);
+    await renderAt(`#/test-cases/${tc?.id ?? ''}`);
     const link = screen
       .getByText('Reason given in the plan')
       .nextElementSibling?.querySelector('a');
     expect(link).toBeTruthy();
     fireEvent.click(link as HTMLAnchorElement);
-    go(link?.getAttribute('href') ?? '');
+    await go(link?.getAttribute('href') ?? '');
     expect(document.activeElement?.textContent).toContain(tc?.id ?? '');
   });
 
-  test('no page claims the status is by design, on purpose or permanent', () => {
-    renderAt('#/');
+  test('no page claims the status is by design, on purpose or permanent', async () => {
+    await renderAt('#/');
     const routes = [
       '#/',
       '#/test-plan',
@@ -228,12 +244,12 @@ describe('Automation intent: No', () => {
       ...notAutomated.map((tc) => `#/test-cases/${tc.id}`),
     ];
     for (const route of routes) {
-      go(route);
+      await go(route);
       expect(document.body.textContent, route).not.toMatch(
         /by design|on purpose|manual only|manual-only/i,
       );
     }
-    go('#/');
+    await go('#/');
     expect(
       screen.getByText(
         `${String(summary.testCasesByAutomationIntent.No)} marked Automation: No in the plan`,
@@ -243,8 +259,8 @@ describe('Automation intent: No', () => {
 });
 
 describe('Test Plan', () => {
-  test('renders the plan metadata, every section and every canonical Purpose/Flow from the snapshot', () => {
-    renderAt('#/test-plan');
+  test('renders the plan metadata, every section and every canonical Purpose/Flow from the snapshot', async () => {
+    await renderAt('#/test-plan');
     expect(screen.getByRole('heading', { level: 1, name: snapshot.testPlan.title })).toBeTruthy();
     for (const row of snapshot.testPlan.metadata) expect(screen.getByText(row.item)).toBeTruthy();
     for (const section of snapshot.testPlan.sections) {
@@ -266,31 +282,30 @@ describe('Test Plan', () => {
 });
 
 describe('Navigation and placeholders', () => {
-  test('placeholders say the integration is not connected', () => {
+  test('placeholders say the integration is not connected', async () => {
     for (const [path, title] of [
-      ['#/executions', 'Executions'],
       ['#/ai-agents', 'AI Agents'],
       ['#/defects', 'Defects'],
     ] as const) {
-      const { unmount } = renderAt(path);
+      const { unmount } = await renderAt(path);
       expect(screen.getByRole('heading', { level: 1, name: title })).toBeTruthy();
       expect(screen.getByText('This integration is not connected')).toBeTruthy();
       unmount();
     }
   });
 
-  test('the active page is marked, unavailable pages are tagged, and focus moves to the new page', () => {
-    renderAt('#/');
+  test('the active page is marked, unavailable pages are tagged, and focus moves to the new page', async () => {
+    await renderAt('#/');
     const nav = within(screen.getByRole('navigation', { name: 'Primary' }));
     expect(nav.getByRole('link', { name: 'Overview' }).getAttribute('aria-current')).toBe('page');
-    expect(nav.getAllByText('Not connected')).toHaveLength(3);
-    go('#/test-plan');
+    expect(nav.getAllByText('Not connected')).toHaveLength(2);
+    await go('#/test-plan');
     expect(nav.getByRole('link', { name: 'Test Plan' }).getAttribute('aria-current')).toBe('page');
     expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1 }));
   });
 
-  test('the mobile menu button controls the navigation', () => {
-    renderAt('#/');
+  test('the mobile menu button controls the navigation', async () => {
+    await renderAt('#/');
     const button = screen.getByRole('button', { name: 'Menu' });
     expect(button.getAttribute('aria-controls')).toBe('primary-navigation');
     expect(button.getAttribute('aria-expanded')).toBe('false');
@@ -305,15 +320,15 @@ describe('Navigation and placeholders', () => {
     expect(button.getAttribute('aria-expanded')).toBe('false');
   });
 
-  test('the skip link moves focus to the content without changing the route', () => {
-    renderAt('#/test-plan');
+  test('the skip link moves focus to the content without changing the route', async () => {
+    await renderAt('#/test-plan');
     fireEvent.click(screen.getByRole('link', { name: 'Skip to content' }));
     expect(window.location.hash).toBe('#/test-plan');
     expect(document.activeElement?.id).toBe('main');
   });
 
-  test('Escape closes the mobile menu and returns focus to the menu button', () => {
-    renderAt('#/');
+  test('Escape closes the mobile menu and returns focus to the menu button', async () => {
+    await renderAt('#/');
     const button = screen.getByRole('button', { name: 'Menu' });
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(document.activeElement).not.toBe(button);
@@ -325,8 +340,8 @@ describe('Navigation and placeholders', () => {
     expect(document.activeElement).toBe(button);
   });
 
-  test('background content is inert while the mobile menu is open, and only then', () => {
-    renderAt('#/');
+  test('background content is inert while the mobile menu is open, and only then', async () => {
+    await renderAt('#/');
     const main = document.getElementById('main');
     const brand = screen.getByRole('link', { name: /RequestFlow QA Dashboard/ });
     const skip = screen.getByText('Skip to content');
@@ -341,22 +356,22 @@ describe('Navigation and placeholders', () => {
     for (const element of [main, brand, skip]) expect(element?.hasAttribute('inert')).toBe(false);
   });
 
-  test('choosing a page from the mobile menu closes it and moves focus to the new page', () => {
-    renderAt('#/');
+  test('choosing a page from the mobile menu closes it and moves focus to the new page', async () => {
+    await renderAt('#/');
     fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
     const link = within(screen.getByRole('navigation', { name: 'Primary' })).getByRole('link', {
       name: 'Test Plan',
     });
     fireEvent.click(link);
-    go('#/test-plan');
+    await go('#/test-plan');
     expect(document.getElementById('main')?.hasAttribute('inert')).toBe(false);
     expect(document.activeElement).toBe(
       screen.getByRole('heading', { level: 1, name: snapshot.testPlan.title }),
     );
   });
 
-  test('choosing the current page from the mobile menu moves focus to its heading', () => {
-    renderAt('#/test-plan');
+  test('choosing the current page from the mobile menu moves focus to its heading', async () => {
+    await renderAt('#/test-plan');
     fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
     const nav = within(screen.getByRole('navigation', { name: 'Primary' }));
     fireEvent.click(nav.getByRole('link', { name: 'Test Plan' }));
@@ -366,8 +381,8 @@ describe('Navigation and placeholders', () => {
     expect(document.activeElement).toBe(screen.getByRole('heading', { level: 1 }));
   });
 
-  test('unknown routes show a not-found page', () => {
-    renderAt('#/nowhere');
+  test('unknown routes show a not-found page', async () => {
+    await renderAt('#/nowhere');
     expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeTruthy();
   });
 });

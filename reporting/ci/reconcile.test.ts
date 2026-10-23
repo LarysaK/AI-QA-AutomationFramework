@@ -53,7 +53,7 @@ const temporary = (prefix: string): string => {
 // ---------------------------------------------------------------- synthetic API data
 
 /** A listed CI run (run #2's public data plus head_repository), with changes. */
-function run(change: Record<string, unknown> = {}): Record<string, unknown> {
+export function run(change: Record<string, unknown> = {}): Record<string, unknown> {
   const base = JSON.parse(
     readFileSync(join(FIXTURES, 'github/run-39144953322.json'), 'utf8'),
   ) as Record<string, unknown>;
@@ -695,20 +695,20 @@ const GIT_ENV: Record<string, string> = {
   GIT_COMMITTER_NAME: 'Larysa Karahieorhii',
   GIT_COMMITTER_EMAIL: '92583129+LarysaK@users.noreply.github.com',
 };
-const BOT_ENV = {
+export const BOT_ENV = {
   GIT_AUTHOR_NAME: 'github-actions[bot]',
   GIT_AUTHOR_EMAIL: '41898282+github-actions[bot]@users.noreply.github.com',
   GIT_COMMITTER_NAME: 'github-actions[bot]',
   GIT_COMMITTER_EMAIL: '41898282+github-actions[bot]@users.noreply.github.com',
 };
-function git(cwd: string, env: Record<string, string>, ...args: string[]): string {
+export function git(cwd: string, env: Record<string, string>, ...args: string[]): string {
   const result = spawnSync('git', args, { cwd, encoding: 'utf8', env: { ...GIT_ENV, ...env } });
   assert.equal(result.status, 0, `git ${args.join(' ')}: ${result.stderr}`);
   return result.stdout;
 }
 
 /** A local ci-history like the real one: a README root commit, then one publisher commit. */
-async function history(): Promise<string> {
+export async function history(): Promise<string> {
   const dir = join(temporary('ci-reconcile-history-'), 'ci-history');
   git(tmpdir(), {}, 'init', '-q', '-b', 'ci-history', dir);
   writeFileSync(join(dir, 'README.md'), '# CI history\n');
@@ -728,7 +728,7 @@ async function history(): Promise<string> {
 }
 
 /** Saved API responses: run #2 (published) and one more eligible run with retained artifacts. */
-function apiDir(change: (files: Record<string, unknown>) => void = () => undefined): string {
+export function apiDir(change: (files: Record<string, unknown>) => void = () => undefined): string {
   const dir = temporary('ci-reconcile-api-');
   const files: Record<string, unknown> = {
     'runs-page-1.json': {

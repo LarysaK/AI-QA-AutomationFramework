@@ -12,6 +12,10 @@ beforeEach(() => {
   window.location.hash = '';
 });
 
-afterEach(() => {
-  if (hasDom) cleanup();
+afterEach(async () => {
+  if (!hasDom) return;
+  // jsdom applies a clicked link's hash navigation as a queued task; let it finish here, so it
+  // cannot land in the next test (tests await lazily loaded pages, which yields to that queue).
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  cleanup();
 });

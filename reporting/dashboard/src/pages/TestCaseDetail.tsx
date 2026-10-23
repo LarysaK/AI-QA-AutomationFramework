@@ -1,15 +1,25 @@
 import { MarkdownBlock, MarkdownInline } from '../components/Markdown';
 import { Badge, Callout, Card, PageHeader } from '../components/ui';
 import { instancesFor, planSectionsMentioning, shortSha } from '../data/derive';
-import type { Snapshot } from '../data/types';
+import {
+  type ExecutionHistory,
+  formatInstant,
+  MAPPING_REASON,
+  mapResults,
+  resultKey,
+  runPath,
+} from '../data/history';
+import type { Snapshot, TestInstance } from '../data/types';
 import { href } from '../router';
 
 export function TestCaseDetail({
   snapshot,
+  history = null,
   id,
   query,
 }: {
   snapshot: Snapshot;
+  history?: ExecutionHistory | null;
   id: string;
   query: string;
 }) {
@@ -135,12 +145,12 @@ export function TestCaseDetail({
         </Card>
 
         <Card title="Execution">
-          <Callout title="No CI runs yet" tone="empty">
-            <p>
-              There is no execution result for this test case. CI is not connected, and local runs
-              are not published.
-            </p>
-          </Callout>
+          <ExecutionAtSnapshotCommit
+            snapshot={snapshot}
+            history={history}
+            testCase={tc.id}
+            instances={instances}
+          />
         </Card>
       </div>
 
@@ -166,6 +176,112 @@ export function TestCaseDetail({
           <span />
         )}
       </nav>
+    </>
+  );
+}
+
+/**
+ * This test case's results in the newest published CI run of the snapshot's own commit, under the
+ * mapping contract (data/history.ts mapResults): only results whose instance is mapped to this test
+ * case in both directions are shown; never inferred from suite counts or matched by title.
+ */
+function ExecutionAtSnapshotCommit({
+  snapshot,
+  history,
+  testCase,
+  instances,
+}: {
+  snapshot: Snapshot;
+  history: ExecutionHistory | null;
+  testCase: string;
+  instances: readonly TestInstance[];
+}) {
+  if (history === null) {
+    return (
+      <Callout title="Execution history is not included in this build" tone="empty">
+        <p>
+          No CI result can be shown here. Published CI runs are listed on the{' '}
+          <a href={href('/executions')}>Executions</a> page of builds that include them.
+        </p>
+      </Callout>
+    );
+  }
+  if (instances.length === 0) {
+    return (
+      <Callout title="No CI result" tone="empty">
+        <p>No committed test is linked to this test case, so no CI run reports a result for it.</p>
+      </Callout>
+    );
+  }
+  const run = history.records.find(
+    (record) => record.commitSha === snapshot.source.commit && record.playwright !== null,
+  );
+  if (run === undefined) {
+    return (
+      <Callout title="No published CI run of this commit" tone="empty">
+        <p>
+          No published CI run tested commit <code>{shortSha(snapshot.source.commit)}</code>, which
+          this dashboard describes. Results of runs of other commits are not mapped to test cases.{' '}
+          <a href={href('/executions')}>All executions</a>
+        </p>
+      </Callout>
+    );
+  }
+  const mapping = mapResults(run, snapshot);
+  if (mapping.status === 'unavailable') {
+    return (
+      <Callout title="CI results are not mapped to this test case" tone="empty">
+        <p>
+          Published CI run <a href={href(runPath(run))}>#{String(run.run.number)}</a> tested this
+          commit, but {MAPPING_REASON[mapping.reason ?? 'no-results']}.
+        </p>
+      </Callout>
+    );
+  }
+  return (
+    <>
+      <p>
+        In published CI run <a href={href(runPath(run))}>#{String(run.run.number)}</a> of this
+        commit, completed {formatInstant(run.timestamps.jobCompletedAt)}:
+      </p>
+      <ul className="plain-list">
+        {instances.flatMap((instance) =>
+          instance.projects.map((project) => {
+            const key = resultKey({ instanceId: instance.id, project });
+            const result = run.playwright?.results.find((r) => resultKey(r) === key);
+            const link = mapping.links.get(key);
+            return (
+              <li key={key}>
+                {instance.title} ({project}):{' '}
+                {result === undefined ? (
+                  'no result recorded'
+                ) : link?.kind !== 'mapped' ? (
+                  `not mapped (${link?.why ?? 'unknown'})`
+                ) : !link.testCases.includes(testCase) ? (
+                  'not mapped (the linkage is not confirmed in both directions)'
+                ) : (
+                  <Badge
+                    tone={
+                      result.status === 'passed'
+                        ? 'accent'
+                        : result.status === 'skipped'
+                          ? 'outline'
+                          : 'warning'
+                    }
+                  >
+                    {result.status}
+                  </Badge>
+                )}
+              </li>
+            );
+          }),
+        )}
+      </ul>
+      <p className="fine-print">
+        The result of each linked test instance as Playwright reported it in that run, shown only
+        where the mapping is exact. A passing linked test is not proof that every row or behaviour
+        of the scenario is exercised.
+      </p>
     </>
   );
 }

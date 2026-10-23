@@ -1,7 +1,7 @@
 /*
  * RequestFlow QA Dashboard — light theme.
- * Colour is used sparingly: indigo marks linked automation, amber marks manual-only test cases,
- * and green is not used at all, because no execution results exist yet.
+ * Colour is used sparingly: indigo marks linked automation and successful published CI results,
+ * amber marks manual-only test cases and failed or flaky CI results, and green is not used.
  */
 
 :root {
@@ -562,9 +562,70 @@ h1 {
   color: var(--text-subtle);
 }
 
+/* ------------------------------------------------------------------ page loading */
+
+.page-loading {
+  margin: 24px 0;
+  color: var(--text-muted);
+}
+
+/* ------------------------------------------------------------------ executions */
+
+.stats-compact {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.stats-compact .stat {
+  padding: 10px 14px;
+  box-shadow: none;
+}
+
+.stats-compact .stat-value {
+  font-size: 20px;
+}
+
+/* Commit hashes and IDs in tables stay on one line (the table scrolls instead). */
+.data-table code {
+  white-space: nowrap;
+}
+
+/* Wide execution tables keep a readable first column and scroll sideways on small screens. */
+.exec-table tbody th {
+  min-width: 13rem;
+}
+
+/* A short description under a table row heading. */
+.cell-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text-subtle);
+  white-space: normal;
+  max-width: 34ch;
+}
+
+.step-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.external::after {
+  /* Empty alternative text: the arrow is decorative; the link names its destination. */
+  content: ' ↗' / '';
+}
+
 /* ------------------------------------------------------------------ tables */
 
 .table-scroll {
+  /* A positioning context, so visually hidden text inside a cell stays within the scroll box. */
+  position: relative;
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-small);
