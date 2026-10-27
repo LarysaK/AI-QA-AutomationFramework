@@ -29,19 +29,19 @@ committed Playwright test is traceably linked and exercises the scenario as writ
 | Requirement                                         | Endpoint                          | Test cases | Automated | Investigate | Manual by design | Not yet automated | Canonical tests  |
 | --------------------------------------------------- | --------------------------------- | ---------: | --------: | ----------: | ---------------: | ----------------: | ---------------- |
 | [REQ-001 — Create a request](#req-001)              | `POST /api/requests`              |         18 |        12 |           0 |                0 |                 6 | CAN-001, CAN-002 |
-| [REQ-002 — Edit a draft request](#req-002)          | `PATCH /api/requests/:id`         |         11 |         2 |           1 |                0 |                 8 | CAN-003          |
+| [REQ-002 — Edit a draft request](#req-002)          | `PATCH /api/requests/:id`         |         11 |         3 |           0 |                0 |                 8 | CAN-003          |
 | [REQ-003 — Submit a request](#req-003)              | `PATCH /api/requests/:id/submit`  |          8 |         1 |           0 |                0 |                 7 | CAN-004 (step)   |
 | [REQ-004 — Review queue](#req-004)                  | `GET /api/review-queue`           |          8 |         1 |           0 |                1 |                 6 | CAN-004 (step)   |
 | [REQ-005 — Approve a request](#req-005)             | `PATCH /api/requests/:id/approve` |          8 |         1 |           0 |                0 |                 7 | CAN-004          |
 | [REQ-006 — Reject a request](#req-006)              | `PATCH /api/requests/:id/reject`  |         12 |         2 |           0 |                0 |                10 | CAN-005          |
-| [REQ-007 — Authorization](#req-007)                 | All business endpoints            |          7 |         0 |           0 |                0 |                 7 | —                |
+| [REQ-007 — Authorization](#req-007)                 | All business endpoints            |          7 |         4 |           0 |                0 |                 3 | —                |
 | [REQ-008 — Request retrieval through API](#req-008) | `GET /api/requests/:id`           |          8 |         1 |           0 |                0 |                 7 | CAN-004, CAN-005 |
-| [REQ-009 — List own requests](#req-009)             | `GET /api/requests`               |          8 |         0 |           0 |                1 |                 7 | —                |
-| [REQ-010 — Demo authentication](#req-010)           | `POST /api/auth/login`, `/logout` |          8 |         0 |           0 |                0 |                 8 | —                |
-| **All**                                             |                                   |     **96** |    **20** |       **1** |            **2** |            **73** |                  |
+| [REQ-009 — List own requests](#req-009)             | `GET /api/requests`               |          8 |         3 |           0 |                1 |                 4 | —                |
+| [REQ-010 — Demo authentication](#req-010)           | `POST /api/auth/login`, `/logout` |          8 |         5 |           0 |                0 |                 3 | —                |
+| **All**                                             |                                   |     **96** |    **33** |       **0** |            **2** |            **61** |                  |
 
-Every one of the 10 requirements has test cases in the approved plan. Seven have at least one
-automated test case; **REQ-007, REQ-009 and REQ-010 have none.**
+Every one of the 10 requirements has test cases in the approved plan, and every one has at least
+one automated test case. REQ-007, REQ-009 and REQ-010 had none until M10B.
 
 ---
 
@@ -69,9 +69,10 @@ An Employee must be able to edit their own request while it is in `DRAFT`
 invalid values change nothing; non-`DRAFT` is `409`; another Employee's request is `404`; a
 Reviewer gets `403`; success updates `updatedAt` and returns `200`.
 
-**Coverage.** TC-002-01 – TC-002-11. Automated (CAN-003): TC-002-04 (atomic failure) and
-TC-002-10 (`409` after submission). TC-002-02 is linked but needs investigation: its test patches
-`title`, while the scenario names `amount` (see [D](04-test-case-catalog.md#tc-002-02)).
+**Coverage.** TC-002-01 – TC-002-11. Automated (CAN-003): TC-002-02 (partial update of only
+`amount`, `updatedAt` strictly later; corrected in M10B under an owner-approved H5 exception, see
+[D](04-test-case-catalog.md#tc-002-02)), TC-002-04 (atomic failure) and TC-002-10 (`409` after
+submission).
 Authorization cases TC-002-07 – TC-002-09 are not yet automated.
 
 <a id="req-003"></a>
@@ -153,9 +154,12 @@ TC-007-06 (error response shape and codes), TC-007-07 (UI offers actions only wh
 Most per-endpoint authorization cases are owned by the requirement of the operation (for
 example TC-001-15, TC-002-08, TC-002-09, TC-005-06, TC-008-03).
 
-**Coverage: none automated.** No committed test carries a `@TC-007-…` tag, and none of the
-per-endpoint `403`/`404` authorization cases owned by other requirements is automated either.
-The E2E tests check, as part of their own scenarios, that some UI controls are hidden after
+**Coverage.** Automated (M10B, [`authorization.spec.ts`](../tests/requestflow/api/authorization.spec.ts)):
+TC-007-01 (401 before 403), TC-007-02 (403 before 404), TC-007-04 (404 before 409, with the
+request unchanged) and TC-007-06 (error shape for 400, 401, 403, 404 and 409). Not yet automated:
+TC-007-03, TC-007-05 and the UI case TC-007-07; the per-endpoint `403`/`404` cases owned by other
+requirements are not automated either. An unconfirmed observation about unparsable JSON bodies is
+recorded for human triage in [M](13-limitations-risks-and-roadmap.md), finding 10. The E2E tests check, as part of their own scenarios, that some UI controls are hidden after
 submission and after review; that is incidental, untagged, and not evidence for TC-007-07 or for
 server-side enforcement.
 
@@ -196,9 +200,10 @@ nothing of other Employees, newest first, and Reviewers refused.
 response shape, ordering, empty list, Reviewer `403`, no session `401`, and the UI My requests
 table.
 
-**Coverage: none automated.** TC-009-05 (empty list) is manual by design (plan §6); the other
-seven are not yet automated. The UI tests open the My requests page only to navigate to New
-request; they do not assert its contents.
+**Coverage.** Automated (M10B, [`list-own-requests.spec.ts`](../tests/requestflow/api/list-own-requests.spec.ts)):
+TC-009-01 (own requests in all four statuses), TC-009-02 (no other Employee's requests; every item
+is the Employee's own) and TC-009-06 (Reviewer `403`). TC-009-05 (empty list) is manual by design
+(plan §6); TC-009-03, TC-009-04, TC-009-07 and the UI case TC-009-08 are not yet automated.
 
 <a id="req-010"></a>
 
@@ -231,10 +236,11 @@ the invalidated cookie, `401` on all 8 business endpoints, UI login and logout, 
 redirect to `/login` (TC-010-08, which the plan flags as implemented behaviour that Requirements
 v1.2 do not define).
 
-**Coverage: none automated.** Every automated test logs in as a precondition, through
-`RequestFlowApi.loginAs` ([`requestflow-api.client.ts`](../apps/requestflow/api/requestflow-api.client.ts))
-or the UI login buttons; a failed login stops the test. That exercises login, but no test asserts
-the REQ-010 criteria (response body, cookie, logout, `401` after logout or without a session).
+**Coverage.** Automated (M10B, [`demo-authentication.spec.ts`](../tests/requestflow/api/demo-authentication.spec.ts)):
+TC-010-01 (each demo user: body and `rf_session` cookie), TC-010-02, TC-010-03 (`204`, empty
+body), TC-010-04 (the saved cookie value, replayed in a fresh context, is `401` after logout) and
+TC-010-05 (all eight protected endpoints without a session). The UI cases TC-010-06 – TC-010-08
+are not yet automated.
 
 ---
 

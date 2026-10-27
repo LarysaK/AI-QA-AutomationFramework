@@ -5,29 +5,43 @@
 | Path                                                                                                  | Contents                                                                                                                                                                              |
 | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`playwright.config.ts`](../playwright.config.ts)                                                     | Runtime configuration: test directory, reporters, `webServer`, `globalSetup`, project `chromium`                                                                                      |
-| [`tests/requestflow/api/`](../tests/requestflow/api/)                                                 | API tests (CAN-002, CAN-003)                                                                                                                                                          |
+| [`tests/requestflow/api/`](../tests/requestflow/api/)                                                 | API tests: CAN-002, CAN-003, and the REQ-007, REQ-009 and REQ-010 API tests (M10B)                                                                                                    |
 | [`tests/requestflow/ui/`](../tests/requestflow/ui/)                                                   | UI tests (CAN-001)                                                                                                                                                                    |
 | [`tests/requestflow/e2e/`](../tests/requestflow/e2e/)                                                 | Cross-role E2E workflows (CAN-004, CAN-005)                                                                                                                                           |
 | [`apps/requestflow/pages/`](../apps/requestflow/pages/)                                               | Page objects: login, My requests, request form, request details, review queue                                                                                                         |
 | [`apps/requestflow/api/requestflow-api.client.ts`](../apps/requestflow/api/requestflow-api.client.ts) | A thin typed client over the JSON API                                                                                                                                                 |
+| [`apps/requestflow/api/api-sessions.ts`](../apps/requestflow/api/api-sessions.ts)                     | One API request context per user of a test, disposed in `finally`                                                                                                                     |
 | [`apps/requestflow/data/demo-users.ts`](../apps/requestflow/data/demo-users.ts)                       | The three demo users                                                                                                                                                                  |
 | [`apps/requestflow/global-setup.ts`](../apps/requestflow/global-setup.ts)                             | Resets the AUT once per run                                                                                                                                                           |
 | [`framework/`](../framework/)                                                                         | **Planned** shared runtime (fixtures, base classes, config, data, API). At the audit commit it holds only `.gitkeep` placeholders; tests use Playwright's built-in fixtures directly. |
 
-## Suite at the audit commit (verified)
+## Suite (verified at commit `74ea929`)
 
-| File                                                                                                  |            Tests | Test cases                                 | Canonical |
-| ----------------------------------------------------------------------------------------------------- | ---------------: | ------------------------------------------ | --------- |
-| [`api/create-request-validation.spec.ts`](../tests/requestflow/api/create-request-validation.spec.ts) | 24 (data-driven) | TC-001-02 – TC-001-12                      | CAN-002   |
-| [`api/edit-draft-request.spec.ts`](../tests/requestflow/api/edit-draft-request.spec.ts)               |                3 | TC-002-02, TC-002-04, TC-002-10            | CAN-003   |
-| [`ui/create-request.spec.ts`](../tests/requestflow/ui/create-request.spec.ts)                         |                1 | TC-001-17                                  | CAN-001   |
-| [`e2e/approve-request.spec.ts`](../tests/requestflow/e2e/approve-request.spec.ts)                     |                1 | TC-003-08, TC-004-08, TC-005-08, TC-008-08 | CAN-004   |
-| [`e2e/reject-request.spec.ts`](../tests/requestflow/e2e/reject-request.spec.ts)                       |                1 | TC-006-11, TC-006-12, TC-008-08            | CAN-005   |
-| **Total**                                                                                             |           **30** | **21 linked**                              | 5         |
+| File                                                                                                  |            Tests | Test cases                                                                    | Canonical |
+| ----------------------------------------------------------------------------------------------------- | ---------------: | ----------------------------------------------------------------------------- | --------- |
+| [`api/create-request-validation.spec.ts`](../tests/requestflow/api/create-request-validation.spec.ts) | 24 (data-driven) | TC-001-02 – TC-001-12                                                         | CAN-002   |
+| [`api/edit-draft-request.spec.ts`](../tests/requestflow/api/edit-draft-request.spec.ts)               |                3 | TC-002-02, TC-002-04, TC-002-10                                               | CAN-003   |
+| [`api/demo-authentication.spec.ts`](../tests/requestflow/api/demo-authentication.spec.ts)             | 14 (data-driven) | TC-010-01 (3 users), TC-010-02, TC-010-03, TC-010-04, TC-010-05 (8 endpoints) | —         |
+| [`api/authorization.spec.ts`](../tests/requestflow/api/authorization.spec.ts)                         |  8 (data-driven) | TC-007-01, TC-007-02, TC-007-04, TC-007-06 (5 statuses)                       | —         |
+| [`api/list-own-requests.spec.ts`](../tests/requestflow/api/list-own-requests.spec.ts)                 |                3 | TC-009-01, TC-009-02, TC-009-06                                               | —         |
+| [`ui/create-request.spec.ts`](../tests/requestflow/ui/create-request.spec.ts)                         |                1 | TC-001-17                                                                     | CAN-001   |
+| [`e2e/approve-request.spec.ts`](../tests/requestflow/e2e/approve-request.spec.ts)                     |                1 | TC-003-08, TC-004-08, TC-005-08, TC-008-08                                    | CAN-004   |
+| [`e2e/reject-request.spec.ts`](../tests/requestflow/e2e/reject-request.spec.ts)                       |                1 | TC-006-11, TC-006-12, TC-008-08                                               | CAN-005   |
+| **Total**                                                                                             |           **55** | **33 linked**                                                                 | 5         |
 
-All 30 passed, first attempt, in published CI run
-[#23](https://github.com/LarysaK/AI-QA-AutomationFramework/actions/runs/40497439668) at the audit
-commit. The full per-test listing is in the [coverage matrix](05-automation-coverage-matrix.md#committed-playwright-tests-and-the-test-cases-they-carry).
+Execution evidence, kept apart:
+
+- **Published CI.** The 30 tests of the M6 audit commit all passed, first attempt, in published CI
+  run [#23](https://github.com/LarysaK/AI-QA-AutomationFramework/actions/runs/40497439668). The
+  latest published run, [#31](https://github.com/LarysaK/AI-QA-AutomationFramework/actions/runs/40544055341),
+  tested `3b7438a` (the base of M10B): 30 of 30 passed. The 25 tests added in M10B and the
+  corrected TC-002-02 test have no published CI result yet.
+- **Local (M10B).** At commit `74ea929` the full suite passed 5 times in a row with
+  `--repeat-each=5 --retries=0` (275 of 275), with the default workers and with `CI=1` and 2
+  workers; the four changed or new API files also passed 20 times with 8 workers (560 of 560).
+  These are local results, not published records.
+
+The full per-test listing is in the [coverage matrix](05-automation-coverage-matrix.md#committed-playwright-tests-and-the-test-cases-they-carry).
 
 ## Patterns
 
@@ -41,6 +55,11 @@ commit. The full per-test listing is in the [coverage matrix](05-automation-cove
 - **E2E tests** use one browser context per user, so Alex and Jordan are logged in at the same
   time with separate cookies, and finish with an API check of the persisted state (CAN-004,
   CAN-005). Shared lists (the review queue) are searched by a unique, random title.
+- **Multi-user API tests** open one request context per user through `ApiSessions`, so cookies
+  never mix, and dispose them in `finally`. Session invalidation (TC-010-04) replays the saved
+  cookie value explicitly in a fresh context, with a pre-logout control, so the test cannot pass
+  just because the client dropped the expired cookie. Shared lists are checked only for the
+  test's own requests (inclusion, exclusion, status), never for their length.
 - **Data-driven tests** generate one Playwright test per data row from a table (CAN-002), so each
   boundary is reported separately.
 
@@ -54,7 +73,7 @@ npm run test:headed                        # the same, in a visible browser
 npx playwright test --grep @CAN-004        # one canonical pattern
 npx playwright test --grep @REQ-006        # everything traced to a requirement
 npx playwright test --grep @TC-001-10      # one test case (all its data rows)
-npx playwright test --list                 # discovery only: 30 tests in 5 files
+npx playwright test --list                 # discovery only: 55 tests in 8 files
 ```
 
 What `npm test` does (verified in [`playwright.config.ts`](../playwright.config.ts) and

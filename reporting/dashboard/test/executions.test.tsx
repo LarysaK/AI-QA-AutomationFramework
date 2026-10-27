@@ -208,7 +208,13 @@ describe('Executions: run detail', () => {
     await renderAt('#/executions/39930898982-1', withCommit(snapshot.source.commit));
     const table = within(screen.getByRole('region', { name: 'Playwright test results' }));
     expect(table.getByRole('columnheader', { name: 'Test cases' })).toBeTruthy();
-    const instance = snapshot.testInstances[0];
+    // An instance with a result in the fixture run; tests committed after it have none.
+    const recorded = new Set(
+      (FIXTURE.records[0]?.playwright?.results ?? []).map((r) => r.instanceId),
+    );
+    const instance = snapshot.testInstances.find(
+      (i) => recorded.has(i.id) && i.tags.testCases.length > 0,
+    );
     expect(instance).toBeDefined();
     if (instance !== undefined && instance.tags.testCases[0] !== undefined) {
       expect(

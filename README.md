@@ -20,15 +20,15 @@ forbids runtime code from importing `agents/**` or an LLM SDK. See
 
 ## At a glance
 
-| Area         | Status                                                                                                                                                                                                                |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Requirements | [RequestFlow Requirements v1.2](specs/requestflow/requirements.md): 10 approved requirements (frozen)                                                                                                                 |
-| Test design  | [Test Plan v1](specs/requestflow/test-plan.md): 96 traceable test cases (82 API, 11 UI, 3 E2E)                                                                                                                        |
-| Automation   | 30 Playwright tests in 5 files: the five canonical reference tests CAN-001 – CAN-005. 21 test cases are linked by tags, 20 of them fully consistent; see the [coverage matrix](docs/05-automation-coverage-matrix.md) |
-| CI           | GitHub Actions on every push and pull request to `main`; actions pinned to commit SHAs                                                                                                                                |
-| CI history   | One immutable, approval-gated record per CI run on `main`, on the `ci-history` branch, with read-only reconciliation                                                                                                  |
-| Dashboard    | Read-only, build-time data, strict CSP; published on GitHub Pages after each published CI record                                                                                                                      |
-| AI agents    | Three AI agents (Planner, Generator, Healer) and the deterministic Validator implemented; **no live model run yet; H7 closed**                                                                                        |
+| Area         | Status                                                                                                                                                                                                                                                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Requirements | [RequestFlow Requirements v1.2](specs/requestflow/requirements.md): 10 approved requirements (frozen)                                                                                                                                                                                                         |
+| Test design  | [Test Plan v1](specs/requestflow/test-plan.md): 96 traceable test cases (82 API, 11 UI, 3 E2E)                                                                                                                                                                                                                |
+| Automation   | 55 Playwright tests in 8 files: the five canonical reference tests CAN-001 – CAN-005 and risk-based API tests for REQ-007, REQ-009 and REQ-010. 33 test cases are linked by tags, all consistent with their approved scenario; P0: 14 of 38; see the [coverage matrix](docs/05-automation-coverage-matrix.md) |
+| CI           | GitHub Actions on every push and pull request to `main`; actions pinned to commit SHAs                                                                                                                                                                                                                        |
+| CI history   | One immutable, approval-gated record per CI run on `main`, on the `ci-history` branch, with read-only reconciliation                                                                                                                                                                                          |
+| Dashboard    | Read-only, build-time data, strict CSP; published on GitHub Pages after each published CI record                                                                                                                                                                                                              |
+| AI agents    | Three AI agents (Planner, Generator, Healer) and the deterministic Validator implemented; **no live model run yet; H7 closed**                                                                                                                                                                                |
 
 ## Repository layout
 
@@ -80,7 +80,7 @@ Not implemented yet:
 - [ ] A live Generator run (real model output)
 - [ ] A live Planner or Healer run (both v1 agents are offline-only)
 - [ ] Proposal approval and apply workflow
-- [ ] Automation of the remaining test cases (73 not yet automated, 2 manual by design)
+- [ ] Automation of the remaining test cases (61 not yet automated, 2 manual by design)
 - [ ] External integrations (Jira, Azure DevOps, GitHub, MCP)
 
 ## AI agent architecture

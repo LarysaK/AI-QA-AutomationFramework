@@ -230,9 +230,9 @@ describe('dashboard data: the approved RequestFlow documents and committed tests
       testCasesByPriority: { P0: 38, P1: 50, P2: 8 },
       testCasesByAutomationIntent: { Yes: 94, No: 2 },
       canonicals: 5,
-      testInstances: 30,
-      linkedTestCases: 21,
-      linkedTestCasesWithIntentYes: 21,
+      testInstances: 55,
+      linkedTestCases: 33,
+      linkedTestCasesWithIntentYes: 33,
     });
     const perRequirement: Record<string, number> = {};
     for (const tc of first().testCases) {
@@ -247,7 +247,10 @@ describe('dashboard data: the approved RequestFlow documents and committed tests
       'REQ-004': 1,
       'REQ-005': 1,
       'REQ-006': 2,
+      'REQ-007': 4,
       'REQ-008': 1,
+      'REQ-009': 3,
+      'REQ-010': 5,
     });
   });
 

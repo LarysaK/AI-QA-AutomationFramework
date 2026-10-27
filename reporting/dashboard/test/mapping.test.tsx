@@ -31,9 +31,14 @@ const results = (record: RunRecord) => record.playwright?.results ?? [];
 const setResults = (record: RunRecord, list: unknown[]): void => {
   (record as unknown as { playwright: { results: unknown[] } }).playwright.results = list;
 };
-/** A linked instance and one of its test cases from the real snapshot. */
+/**
+ * A linked instance of the real snapshot that has a result in the fixture's newest run, and one of
+ * its test cases. Tests committed after that run have no result in it and are skipped here.
+ */
 function linkedInstance(s: Snapshot = snapshot): { instance: TestInstance; testCase: string } {
+  const recorded = new Set(results(FIXTURE.records[0] as RunRecord).map((r) => r.instanceId));
   for (const instance of s.testInstances) {
+    if (!recorded.has(instance.id)) continue;
     const testCase = instance.tags.testCases.find((tc) =>
       s.testCases.some(
         (c) =>
@@ -129,7 +134,10 @@ describe('mapping: ambiguous, unmatched and stale relationships', () => {
 
   test('a result for a project the instance is not configured for is unmatched (derived)', () => {
     const record = matchingRecord();
-    const first = results(record)[0];
+    // A result of a still-committed instance (a renamed test's old ID is a different case).
+    const first = results(record).find((r) =>
+      snapshot.testInstances.some((i) => i.id === r.instanceId),
+    );
     const other = {
       ...(first ?? { instanceId: '', status: 'passed', attempts: 1 }),
       project: 'webkit',

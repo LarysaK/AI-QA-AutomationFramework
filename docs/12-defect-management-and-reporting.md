@@ -7,9 +7,13 @@
 - An empty defect list is **not** evidence that RequestFlow has no defects. It means only that no
   verified defect records exist.
 - No test is marked `test.fail`, `test.fixme` or skipped for a known defect.
-- At the audit commit, every committed Playwright test passed in CI run #23, and 76 of 96 test
-  cases are not covered by a fully consistent automated test. Unknown defects may exist in the
-  untested behaviour.
+- At the audit commit, every committed Playwright test passed in CI run #23. After M10B, 63 of 96
+  test cases are not covered by a fully consistent automated test (61 not yet automated, 2 manual
+  by design). Unknown defects may exist in the untested behaviour.
+- **One unconfirmed observation awaits human triage** and is not a defect record: an unparsable
+  JSON body on an endpoint the caller's role may not use is expected, from the source, to return
+  `400` rather than `403`; the requirements do not define whether that case falls under the
+  error precedence ([M](13-limitations-risks-and-roadmap.md), finding 10).
 
 ## What is not a defect here
 

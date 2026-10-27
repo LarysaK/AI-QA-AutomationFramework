@@ -30,27 +30,27 @@ async function retrieve(api: RequestFlowApi, id: string): Promise<ApiRequest> {
 
 test.describe('REQ-002 Edit a draft request (API)', { tag: ['@REQ-002', '@CAN-003'] }, () => {
   test(
-    'Employee changes only the title of own DRAFT; all other fields are preserved',
+    'Employee changes only the amount of own DRAFT; all other fields are preserved',
     { tag: '@TC-002-02' },
     async ({ request }) => {
       const api = new RequestFlowApi(request);
       await api.loginAs(employee);
       const original = await createDraft(api);
 
-      const response = await api.updateRequest(original.id, { title: 'QA Conference 2026' });
+      const response = await api.updateRequest(original.id, { amount: 250.75 });
 
       expect(response.status()).toBe(200);
       const updated = (await response.json()) as ApiRequest;
       expect(updated).toMatchObject({
         id: original.id,
-        title: 'QA Conference 2026',
+        title: ORIGINAL.title,
         description: ORIGINAL.description,
-        amount: ORIGINAL.amount,
+        amount: 250.75,
         status: 'DRAFT',
         requester: { id: employee.id, name: employee.name },
         createdAt: original.createdAt,
       });
-      expect(updated.updatedAt).not.toBe(original.updatedAt);
+      expect(Date.parse(updated.updatedAt)).toBeGreaterThan(Date.parse(original.updatedAt));
 
       // Persistence: the stored request is exactly what the PATCH returned.
       expect(await retrieve(api, original.id)).toEqual(updated);

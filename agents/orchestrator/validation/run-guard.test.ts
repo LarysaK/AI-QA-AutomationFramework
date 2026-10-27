@@ -289,7 +289,7 @@ describe('G-RUN: real runs with the AUT', () => {
     ]) {
       assert.ok(paths.includes(canonical), `${canonical} should run`);
     }
-    assert.equal(paths.length, 30);
+    assert.equal(paths.length, 55);
   });
 
   test('a support change that breaks an unchanged canonical test at runtime fails G-RUN', () => {
