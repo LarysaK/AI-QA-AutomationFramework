@@ -1,12 +1,12 @@
-# Agent Standard v1.2
+# Agent Standard v2.0
 
-| Item            | Value                                                                 |
-| --------------- | --------------------------------------------------------------------- |
-| Standard        | `1.2` (see [revision history](#17-revision-history))                  |
-| Envelope schema | [`envelope.schema.json`](envelope.schema.json), `schemaVersion` `1.0` |
-| Applies to      | Planner, Generator, Analyzer, Healer, and the orchestrator            |
-| Builds on       | [ADR-0001](../../docs/adr/0001-ai-outside-test-runtime.md)            |
-| Status          | Frozen                                                                |
+| Item            | Value                                                                     |
+| --------------- | ------------------------------------------------------------------------- |
+| Standard        | `2.0` (see [revision history](#17-revision-history))                      |
+| Envelope schema | [`envelope.schema.json`](envelope.schema.json), `schemaVersion` `2.0`     |
+| Applies to      | Planner, Generator, Healer, and the orchestrator, including the Validator |
+| Builds on       | [ADR-0001](../../docs/adr/0001-ai-outside-test-runtime.md)                |
+| Status          | Frozen                                                                    |
 
 This standard is the single shared contract for every agent and for the orchestrator that runs
 them. Agent definitions (`agents/definitions/`) add only what is specific to one agent; they
@@ -37,11 +37,45 @@ implementation is not part of this document.
 
 | Term            | Meaning                                                                                          |
 | --------------- | ------------------------------------------------------------------------------------------------ |
-| Agent           | An LLM-backed role (Planner, Generator, Analyzer, Healer) that reads and proposes                |
+| Agent           | An LLM-backed role (Planner, Generator, Healer) that reads and proposes                          |
 | Orchestrator    | Deterministic code that prepares tasks, stages artifacts, runs guards and applies changes        |
+| Validator       | The orchestrator's deterministic validation component that runs the guards; not an agent         |
 | Artifact        | One agent output for one task, conforming to the envelope schema                                 |
 | Guard           | A deterministic check run by the orchestrator                                                    |
 | Approved source | A human-approved document or file: requirements, test plan, canonical tests, ADRs, this standard |
+
+### 2.1 Agents
+
+There are exactly three agents. Each produces exactly one artifact type, and each artifact type is
+produced by exactly one agent (envelope schema). An agent's definition (`agents/definitions/<agent>/`)
+adds what is specific to it: its inputs, its output and payload schemas and its agent rules.
+
+| Agent     | Artifact type        | Responsibility                                                                                                                                                    | Changes it may propose (6.2)                      | Gate |
+| --------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- | ---- |
+| Planner   | `test-plan-proposal` | Proposes test-plan additions for approved requirements; the only agent that may propose new, provisional TC IDs (STD-TRC-001)                                     | `plan-change`                                     | H1   |
+| Generator | `test-proposal`      | Proposes new Playwright tests, and support code they need, for approved test cases, tagged with their declared traceability (STD-TRC-002)                         | `test-change` (create), `support-change`          | H2   |
+| Healer    | `heal-proposal`      | Diagnoses a failed test from its run evidence (section 4) and, when the evidence supports it, proposes a repair that preserves what the test checks (STD-SRC-002) | `test-change` (modify), `support-change`; or none | H3   |
+
+- **Diagnosis and repair are one Healer artifact.** A `heal-proposal` without `proposedChanges` is
+  a diagnosis: a report that needs no approval (section 8). A `heal-proposal` with
+  `proposedChanges` is a healing patch: it is validated like any other proposal and applied only
+  after H3. An application defect is recorded as a `defect-candidate` finding, never worked
+  around.
+- **Provenance and evidence.** Every artifact lists its sources (STD-CTX-002) and cites only
+  approved IDs (STD-TRC-001). The orchestrator records in each payload how the output was
+  obtained (the definition version and the model call) and, for the Healer, the run evidence
+  used. Where an agent has a payload schema, G-SCHEMA validates the payload with the envelope
+  (STD-ART-001).
+- **No autonomous execution or repair.** Agents only propose (STD-AUTH-001). Proposed code runs
+  only for validation, only after H7 (STD-AUTH-005), and is applied only after the agent's gate.
+
+### 2.2 The Validator
+
+The Validator is deterministic code in the orchestrator, not an agent: it contains no AI and is not
+counted among the agents. It runs the guards of section 14 in order on one staged artifact, records
+the result separately from the artifact, never mutates approved repository state (STD-AUTH-004),
+and runs execution-capable guards only after H7 (STD-AUTH-005). An agent can never declare its own
+work validated (STD-AUTH-001).
 
 ---
 
@@ -84,8 +118,8 @@ Context is scoped by the task, not by the whole repository:
 4. **Application evidence** — AUT source or rendered pages only when needed to confirm a
    contract (for example an accessible name or a response shape), recorded with role
    `app-evidence` (see STD-SRC-002).
-5. **Run evidence** — Analyzer and Healer only: the failing test, its tags, its result entries
-   and the paths of traces, screenshots and logs.
+5. **Run evidence** — Healer only: the failing test, its tags, its result entries and the paths
+   of traces, screenshots and logs.
 
 **STD-CTX-001 [J]** Read the mandatory context for the task type before proposing. Agent
 definitions set the exact minimum per task type.
@@ -121,7 +155,7 @@ declared for its change. _Guards: G-TRACE, G-DISCOVERY._
 (gate H5). A modified test keeps its tag set unchanged. AI origin is recorded in the artifact
 and the commit, not in test code (ADR-0001). _Guard: G-TRACE._
 
-Analyzer reports cite the test file, test title, tags, TC, REQ, the run and the evidence paths.
+Healer diagnoses cite the test file, test title, tags, TC, REQ, the run and the evidence used.
 
 ### 5.1 Specification format contract
 
@@ -269,8 +303,8 @@ H7 is distinct from H2 and H3: authorizing execution lets proposed code run for 
 the temporary proposed state; it does not approve applying the changes, which still requires a
 fully `VALIDATED` artifact and H2 or H3.
 
-No approval is needed for context discovery, Analyzer reports, validation runs, or discarding
-an artifact.
+No approval is needed for context discovery, Healer diagnoses (a `heal-proposal` without
+`proposedChanges`), validation runs, or discarding an artifact.
 
 ---
 
@@ -283,7 +317,7 @@ that agent's own schema.
 
 | Field              | Content                                                                              |
 | ------------------ | ------------------------------------------------------------------------------------ |
-| `artifactType`     | `test-plan-proposal`, `test-proposal`, `failure-analysis` or `heal-proposal`         |
+| `artifactType`     | `test-plan-proposal`, `test-proposal` or `heal-proposal`                             |
 | `schemaVersion`    | Envelope schema version                                                              |
 | `standardVersion`  | Version of this standard the agent followed                                          |
 | `agent`            | `{ name, definitionVersion }`                                                        |
@@ -316,7 +350,7 @@ Two deliberate constraints:
 - **There is no numeric confidence score.** Uncertainty is expressed through `assumptions`,
   `findings` and `status`.
 
-The `failure-analysis` artifact never contains `proposedChanges`.
+A Healer diagnosis is a `heal-proposal` without `proposedChanges`; a healing patch carries them.
 
 ---
 
@@ -422,9 +456,10 @@ artifacts. Run evidence is quoted only as far as needed; traces are referenced b
 | STD-TST-002  | Authoring conventions                                                            | G/J    | G-STATIC (lint), reviewer    |
 | STD-SEC-001  | No secrets in prompts, artifacts or tests                                        | J      | Reviewer                     |
 
-Agent-specific rules use the prefixes `PLN-`, `GEN-`, `ANA-` and `HEA-` with the same
-numbering. Guard results and findings cite rule IDs. Rule IDs are never reused; a retired rule
-stays in this index marked as retired.
+Agent-specific rules use the prefixes `PLN-`, `GEN-` and `HEA-` with the same numbering. Guard
+results and findings cite rule IDs. Rule IDs are never reused; a retired rule stays in this index
+marked as retired. The `ANA-` prefix (the Analyzer of Standard 1.x) is retired: no rule was ever
+assigned to it, and it is never reused.
 
 ### Guards (contract)
 
@@ -501,6 +536,7 @@ Deferred to later versions or to the orchestrator and agent definitions:
 
 | Version | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2.0     | **Breaking (major); envelope `schemaVersion` 2.0.** Three agents: Planner, Generator and Healer (2.1); the Validator is defined as deterministic orchestrator code, not an agent (2.2). The Analyzer agent and its `failure-analysis` artifact type are removed; failure diagnosis is part of the Healer (`heal-proposal` without `proposedChanges`), which alone reads run evidence (section 4); the `ANA-` rule prefix is retired (section 14). No rule is removed or changed in meaning, and no permission is widened. Compatibility impact: artifacts of the `analyzer` agent or the `failure-analysis` type, and every envelope of major version 1, are rejected by G-SCHEMA with an explicit reason; they are never reinterpreted as Healer artifacts. No Analyzer was implemented and no such artifact was ever committed or published. Migration: agents emit `schemaVersion` `2.0` and `standardVersion` `2.0`; agent definitions require Standard 2.x; staged 1.x proposals are regenerated, not converted. Payload schemas are unchanged.                                                                                                                                                    |
 | 1.2     | Added STD-AUTH-005 [G], gate H7, the H7 checkpoint in the VALIDATE stage, the `EXECUTION_AUTHORIZATION_REQUIRED` pipeline status, and the execution-capable classification of G-DISCOVERY and G-RUN; minor under section 15 ("Human execution checkpoints"): the artifact envelope contract and agent capabilities are unchanged, and only the orchestrator gains an explicit human execution checkpoint. Narrowed the Test path class (6.2) from `tests/**` to TypeScript Playwright test files `tests/**/*.spec.ts` and `tests/**/*.test.ts`; minor under section 15 ("Security-hardening restrictions"). Risk closed: proposed configuration or helper files under `tests/` (for example a `tsconfig.json` that ESLint's TypeScript project service would pick up) could change how the approved checks treat proposed code. Compatibility impact: previously valid test-change proposals for any other file under `tests/` — configuration (`tsconfig.json`, `eslint.config.mjs`, `playwright.config.ts`), helpers (`*.ts` that are not `*.spec.ts`/`*.test.ts`) and JavaScript files (including `*.spec.js`) — are now rejected by G-PATHS. No approved workflow placed such files under `tests/`. |
 | 1.1     | Added the specification format contract (5.1) and STD-TRC-004 [J]. Minor: documents the existing format and adds a judgment rule; no artifact valid under 1.0 becomes invalid.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | 1.0     | Initial frozen standard.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |

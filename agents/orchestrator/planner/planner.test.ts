@@ -265,7 +265,7 @@ describe('Planner: accepted proposals (staged for human review at H1)', () => {
     ]);
     const artifact = readJson(join(result.taskDir, 'artifact.json'));
     assert.equal(artifact['artifactType'], 'test-plan-proposal');
-    assert.deepEqual(artifact['agent'], { name: 'planner', definitionVersion: '1.0' });
+    assert.deepEqual(artifact['agent'], { name: 'planner', definitionVersion: '1.1' });
     assert.equal(artifact['status'], 'READY');
     assert.deepEqual(artifact['proposedChanges'], []);
     assert.deepEqual(artifact['traceability'], {
@@ -784,8 +784,8 @@ describe('Planner rules in the deterministic validator (hand-crafted artifacts)'
     const guard = createSchemaGuard(join(REPO, ENVELOPE_SCHEMA_PATH), payloadSchemas(REPO));
     const generatorArtifact = {
       artifactType: 'test-proposal',
-      schemaVersion: '1.0',
-      standardVersion: '1.2',
+      schemaVersion: '2.0',
+      standardVersion: '2.0',
       agent: { name: 'generator', definitionVersion: '1.0' },
       taskId: 'gen-x',
       status: 'NEEDS_HUMAN_DECISION',

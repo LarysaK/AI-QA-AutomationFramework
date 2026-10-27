@@ -15,6 +15,56 @@ export const PAYLOAD_SCHEMA_PATHS: Readonly<Record<string, string>> = {
 };
 
 /**
+ * Contracts retired in Agent Standard 2.0 (revision history): the Analyzer agent, its
+ * `failure-analysis` artifact type, and every envelope of major version 1. They are rejected with
+ * an explicit reason and never reinterpreted, for example as a Healer artifact; failure diagnosis
+ * is a Healer `heal-proposal`. No such artifact was ever committed or published, so there is no
+ * read-only path for them.
+ */
+export function legacyContractFailures(document: unknown): GuardFailure[] {
+  if (typeof document !== 'object' || document === null) return [];
+  const { artifactType, agent, schemaVersion, standardVersion } = document as Record<
+    string,
+    unknown
+  >;
+  const name =
+    typeof agent === 'object' && agent !== null ? (agent as Record<string, unknown>)['name'] : null;
+  const failure = (reason: string): GuardFailure => ({
+    guard: 'G-SCHEMA',
+    ruleIds: ['STD-ART-001'],
+    reason,
+  });
+  const failures: GuardFailure[] = [];
+  if (name === 'analyzer') {
+    failures.push(
+      failure(
+        '/agent/name "analyzer" is retired (Agent Standard 2.0): the agents are planner, generator and healer; failure diagnosis is a Healer heal-proposal',
+      ),
+    );
+  }
+  if (artifactType === 'failure-analysis') {
+    failures.push(
+      failure(
+        '/artifactType "failure-analysis" is retired (Agent Standard 2.0): failure diagnosis is a Healer heal-proposal without proposedChanges; legacy artifacts are not converted',
+      ),
+    );
+  }
+  for (const [field, value] of [
+    ['schemaVersion', schemaVersion],
+    ['standardVersion', standardVersion],
+  ] as const) {
+    if (typeof value === 'string' && /^1\.\d+$/.test(value)) {
+      failures.push(
+        failure(
+          `/${field} "${value}" is a retired major version 1 (Agent Standard 2.0 requires 2.x): regenerate the proposal; 1.x artifacts are not converted`,
+        ),
+      );
+    }
+  }
+  return failures;
+}
+
+/**
  * G-SCHEMA (STD-ART-001): the artifact is a schema-valid envelope, and its payload is valid
  * against its agent's payload schema when one is given for its artifact type.
  */
@@ -45,6 +95,8 @@ export function createSchemaGuard(
   };
 
   return (document) => {
+    const legacy = legacyContractFailures(document);
+    if (legacy.length > 0) return { guard: 'G-SCHEMA', status: 'failed', failures: legacy };
     if (!validate(document)) {
       const failures = (validate.errors ?? [])
         // `if` errors only say "must match then schema"; the real cause is reported separately.

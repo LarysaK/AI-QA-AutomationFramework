@@ -2,7 +2,7 @@
 
 The Healer **diagnoses one failed Playwright test** from explicitly supplied failure evidence and,
 when the evidence supports it, **proposes a narrowly scoped repair** for human review. It follows
-[Agent Standard v1.2](../agents/standard/standard.md) and
+[Agent Standard v2.0](../agents/standard/standard.md) and
 [ADR-0001](adr/0001-ai-outside-test-runtime.md): **AI proposes, deterministic code validates, a
 human approves.**
 
@@ -130,5 +130,6 @@ provenance, no repository mutation, and Planner regression.
 - All committed tests are canonical (Protected), so repairs can only target support files today.
 - HEA-005 – HEA-008 are deterministic but pattern-based; the human reviewer remains responsible.
 - The report's authenticity is checked structurally and by its SHA-256; it is not signed.
-- The committed Agent Standard and Dashboard still name the Analyzer agent; removing it is a
-  separate, controlled revision.
+- Failure diagnosis is part of the Healer: the Analyzer agent of Agent Standard 1.x is retired,
+  and the validator rejects `analyzer` and `failure-analysis` artifacts rather than reading them
+  as Healer artifacts ([I](09-ai-agent-architecture-and-guardrails.md#three-agent-architecture-agent-standard-20)).

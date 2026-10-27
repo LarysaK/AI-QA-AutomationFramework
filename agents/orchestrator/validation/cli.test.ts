@@ -32,8 +32,8 @@ function artifactFile(
   );
   const artifact = {
     artifactType: 'test-proposal',
-    schemaVersion: '1.0',
-    standardVersion: '1.2',
+    schemaVersion: '2.0',
+    standardVersion: '2.0',
     agent: { name: 'generator', definitionVersion: '1.0' },
     taskId: `cli-${name}`,
     status: 'READY',

@@ -100,7 +100,7 @@ describe('agent layer: drift fails', () => {
     );
   });
 
-  test('a component that is stated absent but now has committed files', () => {
+  test('a retired component that is stated absent but now has committed files', () => {
     const files = filesWith({}, ['agents/orchestrator/analyzer/analyze.ts']);
     expect(verifyAgentLayer(AGENT_LAYER, files)).toContain(
       'agents/orchestrator/analyzer: expected no committed files',
@@ -130,9 +130,12 @@ describe('agent layer: drift fails', () => {
     }
   });
 
-  test('a README checkbox that is ticked (a live run, a new agent)', () => {
+  test('a README checkbox that is ticked (a live run, an apply workflow)', () => {
     const readme = real.read('README.md') ?? '';
-    for (const item of ['A live Generator run (real model output)', 'Analyzer agent']) {
+    for (const item of [
+      'A live Generator run (real model output)',
+      'Proposal approval and apply workflow',
+    ]) {
       const ticked = readme.replace(`- [ ] ${item}`, `- [x] ${item}`);
       expect(verifyAgentLayer(AGENT_LAYER, filesWith({ 'README.md': ticked }))).toContain(
         'README.md: quoted text not found',
@@ -162,20 +165,28 @@ describe('agent layer: drift fails', () => {
 
   test('AI-agent components that are not exactly the standard’s agent roles', () => {
     const problem = `${STANDARD}: the AI agent components are not the standard's agent roles`;
-    // A role added to the standard but not shown.
-    const fiveRoles = standardText().replace(
-      'An LLM-backed role (Planner, Generator, Analyzer, Healer)',
-      'An LLM-backed role (Planner, Generator, Analyzer, Healer, Reviewer)',
-    );
-    expect(verifyAgentLayer(AGENT_LAYER, filesWith({ [STANDARD]: fiveRoles }))).toContain(problem);
+    // A role added to the standard but not shown, including the retired Analyzer.
+    for (const added of ['Analyzer', 'Reviewer']) {
+      const fourRoles = standardText().replace(
+        'An LLM-backed role (Planner, Generator, Healer)',
+        `An LLM-backed role (Planner, Generator, Healer, ${added})`,
+      );
+      expect(fourRoles).not.toBe(standardText());
+      expect(verifyAgentLayer(AGENT_LAYER, filesWith({ [STANDARD]: fourRoles }))).toContain(
+        problem,
+      );
+    }
     // The Validator counted as an AI agent.
     const validatorAsAgent = layerWith((l) => {
-      (l.components[1] as { kind: string }).kind = 'AI agent';
+      const validator = l.components.find((c) => c.id === 'validator');
+      (validator as { kind: string }).kind = 'AI agent';
     });
     expect(verifyAgentLayer(validatorAsAgent, real)).toContain(problem);
     // An agent dropped from the page.
     const dropped = layerWith((l) => {
-      (l as unknown as { components: unknown[] }).components = l.components.slice(0, 4);
+      (l as unknown as { components: unknown[] }).components = l.components.filter(
+        (c) => c.id !== 'healer',
+      );
     });
     expect(verifyAgentLayer(dropped, real)).toContain(problem);
   });

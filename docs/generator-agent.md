@@ -2,7 +2,7 @@
 
 The Generator proposes **one new Playwright TypeScript test** for one explicitly selected,
 approved test case. It is the first AI step of the agent layer, and it follows
-[Agent Standard v1.2](../agents/standard/standard.md) and
+[Agent Standard v2.0](../agents/standard/standard.md) and
 [ADR-0001](adr/0001-ai-outside-test-runtime.md): **AI proposes, deterministic code validates, a
 human approves.**
 
@@ -103,7 +103,9 @@ Result (artifact SHA-256 `422b4a8c603cbadff4aad8ca54771fdb8e33c615c9fbc0496f1306
 
 The demo proves the pipeline and its boundaries; it says nothing about the quality of real model
 output. The demo test was not applied to `tests/`. The evidence record is kept locally under
-`artifacts/proposals/gen-tc-003-07-20261013T124014Z/` (gitignored).
+`artifacts/proposals/gen-tc-003-07-20261013T124014Z/` (gitignored). It was made under Agent
+Standard 1.2 (envelope 1.0); the validator now rejects envelopes of major version 1, so the demo
+artifact is historical and would be regenerated, not converted.
 
 ## Limitations
 
@@ -113,7 +115,7 @@ output. The demo test was not applied to `tests/`. The evidence record is kept l
   the Generator-stage record. Authorizations are not audited.
 - The validator itself treats BLOCKED / NEEDS_HUMAN_DECISION artifacts as INCOMPLETE if run
   directly; the Generator avoids this by not invoking it for them.
-- Context selection depends on Agent Standard 1.2 section numbers and on the headings
+- Context selection depends on Agent Standard section numbers (unchanged from 1.2 to 2.0) and on the headings
   `# Requirements`, `# API` and the test plan's `## 1.`; a change stops the run instead of
   guessing.
 - The ESLint import boundary covers static imports only.

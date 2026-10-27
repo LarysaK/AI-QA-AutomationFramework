@@ -73,9 +73,7 @@ passing tests; ADR-0001 keeps AI before or after execution, never inside it.
 in-memory server cannot guarantee under parallel runs (plan §6).
 
 **"What would you do next?"** Automate the P0 API cases of REQ-007, REQ-009 and REQ-010, resolve
-the TC-002-02 deviation, revise the agent architecture (Planner, Generator, Healer and the
-Validator, without an Analyzer) through a versioned Standard change, and make first, reviewed
-live Planner and Healer runs.
+the TC-002-02 deviation, and make first, reviewed live Planner, Generator and Healer runs.
 
 ## Do not claim
 

@@ -33,7 +33,7 @@ Existing documents that remain authoritative and are linked, not copied:
 
 - [RequestFlow Requirements v1.2](../specs/requestflow/requirements.md) (frozen baseline)
 - [RequestFlow Test Plan v1](../specs/requestflow/test-plan.md) (approved human test design)
-- [Agent Standard v1.2](../agents/standard/standard.md) (frozen agent contract)
+- [Agent Standard v2.0](../agents/standard/standard.md) (frozen agent contract: three AI agents and the deterministic Validator)
 - [ADR-0001: AI agents are outside the deterministic Playwright runtime](adr/0001-ai-outside-test-runtime.md)
 - [Generator Agent v1](generator-agent.md)
 - [Planner Agent v1](planner-agent.md)

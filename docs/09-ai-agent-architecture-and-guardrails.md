@@ -1,30 +1,36 @@
 # I. AI Agent Architecture and Guardrails
 
-> **Status.** All three AI agents, the **Generator**, the **Planner** (M7) and the **Healer** (M8),
-> and the deterministic **validator** are implemented. All agents run **offline only**: the Generator
-> was demonstrated with a hand-written fixture, and the Planner and the Healer read recorded outputs
-> and are tested with a fake model; none has produced real model output. **No live AI model run has been made**, **H7 is
-> closed** (no execution authorization is in effect or stored), and no AI-generated test has been
-> applied to the repository.
+> **Status.** [Agent Standard v2.0](../agents/standard/standard.md) defines **exactly three AI
+> agents**, the **Planner**, the **Generator** and the **Healer**, and the deterministic
+> **Validator**, which is not an AI agent. All of them are implemented. The agents are tested only with
+> a fake model: the Generator has a live mode in code but was demonstrated only offline, with a
+> hand-written fixture, and the Planner and the Healer are offline-only. None has produced real
+> model output. **No live AI model run has been made**, **H7 is closed** (no execution
+> authorization is in effect or stored), and no proposal has been executed or applied
+> autonomously.
 
 ## Principle
 
 **AI proposes, deterministic code validates, a human approves**
-([Agent Standard v1.2 §1](../agents/standard/standard.md#1-principles), [ADR-0001](adr/0001-ai-outside-test-runtime.md)).
+([Agent Standard v2.0 §1](../agents/standard/standard.md#1-principles), [ADR-0001](adr/0001-ai-outside-test-runtime.md)).
 Agents never write to the repository: the orchestrator stages each proposal under
 `artifacts/proposals/<taskId>/` (gitignored), guards validate it, and a human decides. The
 Playwright runtime never imports the agent layer or an LLM SDK (ESLint boundary).
 
 ## Components
 
-| Component           | Kind                                                              | Status                                                                                             | Evidence                                                                                                                                                                   |
-| ------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Agent Standard v1.2 | Shared contract (rules, statuses, gates, guards, envelope schema) | Implemented, frozen                                                                                | [`standard.md`](../agents/standard/standard.md), [`envelope.schema.json`](../agents/standard/envelope.schema.json)                                                         |
-| Generator agent v1  | AI agent                                                          | Implemented; offline demonstration only                                                            | [`definition.md`](../agents/definitions/generator/definition.md), [`orchestrator/generator/`](../agents/orchestrator/generator/), [Generator Agent v1](generator-agent.md) |
-| Validator           | Deterministic orchestrator (no AI)                                | Implemented                                                                                        | [`orchestrator/validation/`](../agents/orchestrator/validation/)                                                                                                           |
-| Planner agent v1    | AI agent                                                          | Implemented; offline only, tested with a fake model; no live run                                   | [`definition.md`](../agents/definitions/planner/definition.md), [`orchestrator/planner/`](../agents/orchestrator/planner/), [Planner Agent v1](planner-agent.md)           |
-| Healer agent v1     | AI agent                                                          | Implemented; offline only, tested with a fake model and synthetic reports; no live run             | [`definition.md`](../agents/definitions/healer/definition.md), [`orchestrator/healer/`](../agents/orchestrator/healer/), [Healer Agent v1](healer-agent.md)                |
-| Analyzer agent      | AI agent                                                          | **Removed from the approved architecture**; still named in the committed Standard v1.2 (see below) | Standard §4, §5                                                                                                                                                            |
+Three AI agents and one deterministic component ([Standard §2.1, §2.2](../agents/standard/standard.md#21-agents)).
+Each agent produces exactly one artifact type; the Validator is never counted as an agent.
+
+| Component           | Kind                                                              | Artifact type        | Status                                                                                 | Evidence                                                                                                                                                                   |
+| ------------------- | ----------------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agent Standard v2.0 | Shared contract (rules, statuses, gates, guards, envelope schema) | —                    | Implemented, frozen; envelope `schemaVersion` 2.0                                      | [`standard.md`](../agents/standard/standard.md), [`envelope.schema.json`](../agents/standard/envelope.schema.json)                                                         |
+| Planner agent v1    | AI agent                                                          | `test-plan-proposal` | Implemented; offline only, tested with a fake model; no live run                       | [`definition.md`](../agents/definitions/planner/definition.md), [`orchestrator/planner/`](../agents/orchestrator/planner/), [Planner Agent v1](planner-agent.md)           |
+| Generator agent v1  | AI agent                                                          | `test-proposal`      | Implemented; offline demonstration only                                                | [`definition.md`](../agents/definitions/generator/definition.md), [`orchestrator/generator/`](../agents/orchestrator/generator/), [Generator Agent v1](generator-agent.md) |
+| Healer agent v1     | AI agent                                                          | `heal-proposal`      | Implemented; offline only, tested with a fake model and synthetic reports; no live run | [`definition.md`](../agents/definitions/healer/definition.md), [`orchestrator/healer/`](../agents/orchestrator/healer/), [Healer Agent v1](healer-agent.md)                |
+| Validator           | Deterministic component (no AI), not an agent                     | —                    | Implemented                                                                            | [`orchestrator/validation/`](../agents/orchestrator/validation/)                                                                                                           |
+
+The agent definitions are at version 1.1 and require Agent Standard 2.x.
 
 ## Generator agent v1 (implemented)
 
@@ -86,9 +92,9 @@ failure.
 | G-DISCOVERY | `playwright test --list` contains the new tests with their declared tags               | **Yes — H7 required** | `discovery-guard.test.ts` |
 | G-RUN       | Targeted run of the proposed test files                                                | **Yes — H7 required** | `run-guard.test.ts`       |
 
-Without H7 the validator ends `INCOMPLETE` (exit 3). The agent suite (`npm run agents:test`, 176
-tests at the audit commit, all passing in CI run #23) tests the guards and the Generator **with a
-fake model**; it makes no model calls.
+Without H7 the validator ends `INCOMPLETE` (exit 3). The agent suite (`npm run agents:test`)
+tests the guards, the three agents and the three-agent contract **with a fake model**; it makes no
+model calls. Its results in published CI runs are on the Dashboard's AI Agents page.
 
 ## Human approval gates H1–H7
 
@@ -143,39 +149,35 @@ be verified from the repository.
 - Any test in `tests/` written by an AI model. All 30 committed tests are hand-written reference
   tests.
 
-## Approved architecture change (pending implementation)
+## Three-agent architecture (Agent Standard 2.0)
 
-The project owner has **approved** this target architecture:
+Agent Standard 2.0 makes the approved architecture the contract: **Planner, Generator and Healer**
+are the only agents, and the **Validator** is deterministic code in the orchestrator, not an agent
+([§2.1, §2.2](../agents/standard/standard.md#21-agents)). Failure diagnosis is part of the Healer: a
+`heal-proposal` without proposed changes is a diagnosis (a report, no approval needed); with
+changes it is a healing patch (H7 for its execution-capable guards, then H3).
 
-| #   | Component           | Kind                                     | Implementation status                            |
-| --- | ------------------- | ---------------------------------------- | ------------------------------------------------ |
-| 1   | **Planner agent**   | AI agent                                 | Implemented (v1, offline only; fake-model tests) |
-| 2   | **Generator agent** | AI agent                                 | Implemented (offline demonstration only)         |
-| 3   | **Healer agent**    | AI agent                                 | Implemented (v1, offline only; fake-model tests) |
-| 4   | **Validator**       | Deterministic component, not an AI agent | Implemented                                      |
+**The Analyzer is retired.** Standard 1.x named a fourth agent, the Analyzer, with a
+`failure-analysis` artifact type. It was never implemented: no definition, no code and no artifact
+was ever committed or published, and the `ci-history` branch contains no Analyzer data. The
+migration therefore needs no read-only compatibility, and none is offered.
 
-The standalone **Analyzer agent has been removed** from the planned architecture.
+**Versioning** (Standard §15). Removing an agent and an artifact type removes enum values from the
+envelope schema, which is breaking, so this is **Standard 2.0** with envelope `schemaVersion` 2.0.
+No rule was removed or changed in meaning, no permission was widened, the payload schemas are
+unchanged, and section numbers are kept, because the agents' context packs select Standard
+sections by number. The agent definitions are 1.1 (minor): they require Standard 2.x and nothing
+else changed.
 
-This is an approved **direction**, not an implementation. The formal revision of the contracts
-is **pending**: at the audit commit these committed files still define four AI agents, including
-the Analyzer, and this documentation-only change deliberately does not modify them.
+| Artifact                                                    | Validator result (G-SCHEMA, STD-ART-001)                                    |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `agent.name` `analyzer`                                     | Rejected: "`analyzer` is retired (Agent Standard 2.0)"                      |
+| `artifactType` `failure-analysis`, by any agent             | Rejected: retired; never read or converted as a `heal-proposal`             |
+| `schemaVersion` or `standardVersion` 1.x, from any agent    | Rejected: retired major version; the proposal is regenerated, not converted |
+| An unknown agent (for example `validator`) or a wrong owner | Rejected by the envelope schema                                             |
+| Rule IDs with the `ANA-` prefix                             | Rejected: the prefix is retired and never reused                            |
 
-| Area               | File                                                                                                                                                                         | What still refers to the Analyzer                                                                                                                                         |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Agent Standard     | [`agents/standard/standard.md`](../agents/standard/standard.md)                                                                                                              | "Applies to Planner, Generator, Analyzer, Healer"; the _Agent_ term; run evidence for "Analyzer and Healer" (§4); Analyzer reports (§5, §8); the `ANA-` rule prefix (§14) |
-| Envelope schema    | [`agents/standard/envelope.schema.json`](../agents/standard/envelope.schema.json)                                                                                            | The `agent.name` enum, and the `failure-analysis` artifact type, which the schema binds to the `analyzer` agent                                                           |
-| Validator types    | [`agents/orchestrator/validation/types.ts`](../agents/orchestrator/validation/types.ts)                                                                                      | `AgentName` includes `'analyzer'`                                                                                                                                         |
-| Dashboard register | [`reporting/dashboard/src/data/agents.ts`](../reporting/dashboard/src/data/agents.ts)                                                                                        | The AI Agents view lists the Analyzer as "Specified only", with evidence quoted from the Standard                                                                         |
-| Dashboard tests    | [`test/agents.test.tsx`](../reporting/dashboard/test/agents.test.tsx), [`test-node/agent-layer-plugin.test.ts`](../reporting/dashboard/test-node/agent-layer-plugin.test.ts) | Expect four AI agents ("3 of 4") and the Analyzer's absent paths                                                                                                          |
-
-**Why it must be one controlled change.** The Standard is frozen (its status table), versioned by
-the rules of §15, and changed only by humans (gate H6). Removing an agent from the schema's enum
-is a breaking change of the envelope (§15). The dashboard's build-time evidence check requires its
-AI-agent list to equal the Standard's _Agent_ term, so changing only one side fails the build by
-design.
-
-**Recommendation** (for a later milestone): a new Agent Standard version that removes the
-Analyzer and reassigns reading run evidence (for example to the Healer); the matching envelope
-schema version (the agent enum and the `failure-analysis` artifact type) and validator types; then the Dashboard register and its tests, so the AI Agents
-view shows "3 of 3". The root README already describes the approved architecture and labels the
-Standard revision as pending.
+A rejected artifact stops at G-SCHEMA; no later guard, and no Healer rule, is applied to it. The
+tests are in [`architecture.test.ts`](../agents/orchestrator/architecture.test.ts): each agent
+stages a valid 2.0 artifact offline, the real validator checks it without H7, the retired
+contracts are rejected, a missing payload schema fails closed, and the repository is unchanged.

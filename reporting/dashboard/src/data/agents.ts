@@ -32,7 +32,7 @@ export type ComponentStatus = 'implemented' | 'specified-only';
 export interface Component {
   readonly id: string;
   readonly name: string;
-  readonly kind: 'AI agent' | 'Deterministic orchestrator';
+  readonly kind: 'AI agent' | 'Deterministic validator';
   readonly status: ComponentStatus;
   readonly purpose: Fact;
   readonly responsibilities: readonly Fact[];
@@ -68,6 +68,10 @@ export interface AgentLayer {
   readonly principle: Fact;
   /** What the standard counts as an agent; the AI-agent components must be exactly these roles. */
   readonly agentRoles: Fact;
+  /** The Validator: deterministic code, not an agent and not counted among them. */
+  readonly validatorRole: Fact;
+  /** The Analyzer of Agent Standard 1.x: retired, never implemented. */
+  readonly retired: Fact;
   readonly components: readonly Component[];
   readonly guards: readonly Guard[];
   readonly gates: readonly Gate[];
@@ -106,39 +110,16 @@ const HEAL = 'agents/orchestrator/healer';
 const HEALER_DEF = 'agents/definitions/healer/definition.md';
 const VAL = 'agents/orchestrator/validation';
 
-const notImplemented = (agent: 'analyzer', label: string): Evidence[] => [
-  { path: `agents/definitions/${agent}`, absent: true },
-  { path: `agents/orchestrator/${agent}`, absent: true },
-  { path: README, quote: `- [ ] ${label} agent` },
-];
-
-const specifiedOnly = (id: 'analyzer', name: string, purpose: Fact, approval: Fact): Component => ({
-  id,
-  name,
-  kind: 'AI agent',
-  status: 'specified-only',
-  purpose,
-  responsibilities: [],
-  code: {
-    text: 'Not implemented: no agent definition and no orchestrator code.',
-    evidence: notImplemented(id, name.replace(/ agent$/, '')),
-  },
-  tests: {
-    text: 'None (nothing to test).',
-    evidence: notImplemented(id, name.replace(/ agent$/, '')),
-  },
-  approval,
-});
-
 export const AGENT_LAYER: AgentLayer = {
   standard: {
-    text: 'Agent Standard v1.2 (frozen) is the shared contract for every agent and for the orchestrator.',
+    text: 'Agent Standard v2.0 (frozen) is the shared contract for the three agents and for the orchestrator, including the Validator.',
     evidence: [
-      { path: STANDARD, quote: '# Agent Standard v1.2' },
+      { path: STANDARD, quote: '# Agent Standard v2.0' },
       { path: STANDARD, quote: '| Status | Frozen |' },
       {
         path: STANDARD,
-        quote: '| Applies to | Planner, Generator, Analyzer, Healer, and the orchestrator |',
+        quote:
+          '| Applies to | Planner, Generator, Healer, and the orchestrator, including the Validator |',
       },
     ],
   },
@@ -161,21 +142,147 @@ export const AGENT_LAYER: AgentLayer = {
     ],
   },
   agentRoles: {
-    text: 'The Agent Standard defines four AI agents, each an LLM-backed role: Planner, Generator, Analyzer and Healer. The Validator is not an agent: it is part of the orchestrator, deterministic code that runs the guards.',
+    text: 'The Agent Standard defines exactly three AI agents, each an LLM-backed role that produces one artifact type: Planner, Generator and Healer.',
     evidence: [
       {
         path: STANDARD,
         quote:
-          '| Agent | An LLM-backed role (Planner, Generator, Analyzer, Healer) that reads and proposes |',
+          '| Agent | An LLM-backed role (Planner, Generator, Healer) that reads and proposes |',
+      },
+      { path: STANDARD, quote: 'There are exactly three agents.' },
+      {
+        path: README,
+        quote:
+          '[Agent Standard v2.0](agents/standard/standard.md) defines **three AI agents**, **Planner**, **Generator** and **Healer**, and one **deterministic Validator**, which is not an AI agent and is never counted as one.',
+      },
+      {
+        path: 'agents/standard/envelope.schema.json',
+        quote: '"enum": ["planner", "generator", "healer"]',
+      },
+    ],
+  },
+  validatorRole: {
+    text: 'The Validator is not an AI agent and is not counted among them: it is deterministic code in the orchestrator that runs the guards, contains no AI and never mutates approved repository state.',
+    evidence: [
+      {
+        path: STANDARD,
+        quote:
+          "| Validator | The orchestrator's deterministic validation component that runs the guards; not an agent |",
       },
       {
         path: STANDARD,
         quote:
-          '| Orchestrator | Deterministic code that prepares tasks, stages artifacts, runs guards and applies changes |',
+          'The Validator is deterministic code in the orchestrator, not an agent: it contains no AI and is not counted among the agents.',
       },
     ],
   },
+  retired: {
+    text: 'The Analyzer agent of Agent Standard 1.x is retired: failure diagnosis is part of the Healer. It was never implemented, and the validator rejects Analyzer and failure-analysis artifacts instead of reinterpreting them.',
+    evidence: [
+      {
+        path: STANDARD,
+        quote:
+          'The Analyzer agent and its `failure-analysis` artifact type are removed; failure diagnosis is part of the Healer',
+      },
+      { path: 'agents/definitions/analyzer', absent: true },
+      { path: 'agents/orchestrator/analyzer', absent: true },
+      {
+        path: `${VAL}/schema-guard.ts`,
+        quote: 'export function legacyContractFailures(document: unknown): GuardFailure[] {',
+      },
+      { path: `${VAL}/schema-guard.ts`, quote: 'They are rejected with' },
+    ],
+  },
   components: [
+    {
+      id: 'planner',
+      name: 'Planner agent',
+      kind: 'AI agent',
+      status: 'implemented',
+      purpose: {
+        text: 'Proposes test-planning additions for explicitly selected, approved requirements: new test cases with provisional IDs and suggested automation candidates. It never changes the requirements or the test plan and never approves its own proposal.',
+        evidence: [
+          { path: PLANNER_DEF, quote: 'The Planner proposes **test-planning additions**' },
+          {
+            path: STANDARD,
+            quote:
+              'Only the Planner may propose new TC IDs; they are provisional, are carried in the Planner payload, and become approved only through gate H1.',
+          },
+        ],
+      },
+      responsibilities: [
+        {
+          text: 'Treats the selected requirement and test-plan text as untrusted data: instruction-like text stops the run before any model call.',
+          evidence: [{ path: PLANNER_DEF, quote: '**Untrusted text screen.**' }],
+        },
+        {
+          text: 'Builds a deterministic context pack of at most 64 KB, never truncated, with a manifest of every source.',
+          evidence: [
+            {
+              path: PLANNER_DEF,
+              quote: '## Context selection (deterministic; hard limit 64 KB; no truncation)',
+            },
+          ],
+        },
+        {
+          text: 'Checks every proposal deterministically (payload schema and rules PLN-001 – PLN-006) and stages it for human review at H1; a rejected proposal is recorded with its reasons and never staged for review.',
+          evidence: [
+            {
+              path: PLANNER_DEF,
+              quote:
+                'Checked deterministically by G-SCHEMA (payload schema) and G-TRACE (Planner content)',
+            },
+            { path: `${VAL}/planner-guard.ts`, tracked: true },
+          ],
+        },
+        {
+          text: 'Offline only in v1: it reads a recorded model output and makes no model call.',
+          evidence: [
+            {
+              path: PLANNER_DEF,
+              quote:
+                'Offline only: `--fake-model-output` is required, and no live model call has been made.',
+            },
+            {
+              path: `${PLAN}/cli.ts`,
+              quote: 'Planner v1 is offline-only: --fake-model-output <file> is required',
+            },
+          ],
+        },
+      ],
+      code: {
+        text: 'Definition, output and payload schemas and prompt in agents/definitions/planner/; orchestrator in agents/orchestrator/planner/ (npm run agents:plan).',
+        evidence: [
+          { path: PLANNER_DEF, tracked: true },
+          { path: 'agents/definitions/planner/planner-output.schema.json', tracked: true },
+          { path: 'agents/definitions/planner/planner-payload.schema.json', tracked: true },
+          { path: 'agents/definitions/planner/prompt.md', tracked: true },
+          { path: `${PLAN}/plan.ts`, tracked: true },
+          { path: PACKAGE, quote: '"agents:plan": "tsx agents/orchestrator/planner/cli.ts"' },
+        ],
+      },
+      tests: {
+        text: 'Automated tests with a fake model: no provider is contacted. Part of the agent suite in CI.',
+        evidence: [
+          {
+            path: `${PLAN}/planner.test.ts`,
+            quote: 'The model is always a fake; no provider is contacted',
+          },
+          { path: PACKAGE, quote: 'agents/orchestrator/planner/planner.test.ts' },
+        ],
+      },
+      approval: {
+        text: 'H1: a staged proposal is reviewed by a human. There is no apply workflow; an accepted proposal reaches the test plan only as an ordinary, reviewed commit by a human.',
+        evidence: [
+          { path: PLANNER_DEF, quote: 'A staged proposal is reviewed by a human at gate **H1**.' },
+          {
+            path: PLANNER_DEF,
+            quote:
+              'There is no apply workflow: an approved proposal reaches `specs/<app>/test-plan.md` only as an ordinary, reviewed commit by a human',
+          },
+        ],
+      },
+    },
     {
       id: 'generator',
       name: 'Generator agent',
@@ -189,7 +296,7 @@ export const AGENT_LAYER: AgentLayer = {
             quote:
               'The Generator proposes **exactly one new Playwright TypeScript test file** for one explicitly selected, approved test case.',
           },
-          { path: GENERATOR_DEF, quote: 'definitionVersion: 1.0' },
+          { path: GENERATOR_DEF, quote: 'definitionVersion: 1.1' },
         ],
       },
       responsibilities: [
@@ -264,9 +371,101 @@ export const AGENT_LAYER: AgentLayer = {
       },
     },
     {
+      id: 'healer',
+      name: 'Healer agent',
+      kind: 'AI agent',
+      status: 'implemented',
+      purpose: {
+        text: 'Diagnoses one Playwright test failure from explicitly supplied evidence and, when the evidence supports it, proposes a narrowly scoped repair for human review. It never applies a repair, never runs proposed code and never weakens or suppresses a test.',
+        evidence: [
+          {
+            path: HEALER_DEF,
+            quote:
+              'The Healer **diagnoses one Playwright test failure** from explicitly supplied evidence',
+          },
+          { path: STANDARD, quote: '| H3 | Healing patches, after validation (Healer) |' },
+        ],
+      },
+      responsibilities: [
+        {
+          text: 'Accepts only authentic failure evidence: a Playwright JSON report in which the selected, committed test failed; otherwise it stops before any model call.',
+          evidence: [{ path: HEALER_DEF, quote: '**Authentic failure evidence.**' }],
+        },
+        {
+          text: 'Treats logs and source as untrusted data: instruction-like text, credentials and personal data stop the run before any model call.',
+          evidence: [{ path: HEALER_DEF, quote: '**Untrusted text screen and secret scan.**' }],
+        },
+        {
+          text: 'Classifies the failure (test code, test data or setup, application defect, environment, insufficient evidence); an application defect is escalated as a defect candidate, never worked around.',
+          evidence: [
+            {
+              path: HEALER_DEF,
+              quote: 'An application defect is never worked around in test code',
+            },
+          ],
+        },
+        {
+          text: 'Checks every proposal deterministically (payload schema and rules HEA-001 – HEA-009: evidence, repair scope, no weakened checks, no suppression, no concealing waits, no claims); a repair is then validated without execution authorization.',
+          evidence: [
+            {
+              path: HEALER_DEF,
+              quote:
+                'Checked deterministically by G-SCHEMA (payload schema) and G-TRACE (Healer content)',
+            },
+            { path: `${VAL}/healer-guard.ts`, tracked: true },
+          ],
+        },
+        {
+          text: 'Offline only in v1: it reads a recorded model output and makes no model call.',
+          evidence: [
+            {
+              path: HEALER_DEF,
+              quote:
+                'Offline only: `--fake-model-output` is required, and no live model call has been made.',
+            },
+            {
+              path: `${HEAL}/cli.ts`,
+              quote: 'Healer v1 is offline-only: --fake-model-output <file> is required',
+            },
+          ],
+        },
+      ],
+      code: {
+        text: 'Definition, output and payload schemas and prompt in agents/definitions/healer/; orchestrator in agents/orchestrator/healer/ (npm run agents:heal).',
+        evidence: [
+          { path: HEALER_DEF, tracked: true },
+          { path: 'agents/definitions/healer/healer-output.schema.json', tracked: true },
+          { path: 'agents/definitions/healer/healer-payload.schema.json', tracked: true },
+          { path: 'agents/definitions/healer/prompt.md', tracked: true },
+          { path: `${HEAL}/heal.ts`, tracked: true },
+          { path: PACKAGE, quote: '"agents:heal": "tsx agents/orchestrator/healer/cli.ts"' },
+        ],
+      },
+      tests: {
+        text: 'Automated tests with a fake model and synthetic failure reports: no provider is contacted, nothing is applied. Part of the agent suite in CI.',
+        evidence: [
+          {
+            path: `${HEAL}/healer.test.ts`,
+            quote: 'The model is always a fake; no provider is contacted',
+          },
+          { path: PACKAGE, quote: 'agents/orchestrator/healer/healer.test.ts' },
+        ],
+      },
+      approval: {
+        text: 'A diagnosis needs no approval. A repair needs a human H7 authorization for its execution-capable guards (closed) and approval at H3 to be applied, as an ordinary reviewed commit.',
+        evidence: [
+          {
+            path: HEALER_DEF,
+            quote: 'A diagnosis is a report: no approval is needed to stage it.',
+          },
+          { path: HEALER_DEF, quote: 'and applying it needs gate **H3**' },
+        ],
+      },
+    },
+    {
       id: 'validator',
       name: 'Validator',
-      kind: 'Deterministic orchestrator',
+      kind: 'Deterministic validator',
       status: 'implemented',
       purpose: {
         text: 'Validates one agent artifact against the repository with seven deterministic guards. No AI is involved, and it is read-only.',
@@ -358,212 +557,6 @@ export const AGENT_LAYER: AgentLayer = {
             quote:
               'H7 is distinct from H2 and H3: authorizing execution lets proposed code run for validation',
           },
-        ],
-      },
-    },
-    {
-      id: 'planner',
-      name: 'Planner agent',
-      kind: 'AI agent',
-      status: 'implemented',
-      purpose: {
-        text: 'Proposes test-planning additions for explicitly selected, approved requirements: new test cases with provisional IDs and suggested automation candidates. It never changes the requirements or the test plan and never approves its own proposal.',
-        evidence: [
-          { path: PLANNER_DEF, quote: 'The Planner proposes **test-planning additions**' },
-          {
-            path: STANDARD,
-            quote:
-              'Only the Planner may propose new TC IDs; they are provisional, are carried in the Planner payload, and become approved only through gate H1.',
-          },
-        ],
-      },
-      responsibilities: [
-        {
-          text: 'Treats the selected requirement and test-plan text as untrusted data: instruction-like text stops the run before any model call.',
-          evidence: [{ path: PLANNER_DEF, quote: '**Untrusted text screen.**' }],
-        },
-        {
-          text: 'Builds a deterministic context pack of at most 64 KB, never truncated, with a manifest of every source.',
-          evidence: [
-            {
-              path: PLANNER_DEF,
-              quote: '## Context selection (deterministic; hard limit 64 KB; no truncation)',
-            },
-          ],
-        },
-        {
-          text: 'Checks every proposal deterministically (payload schema and rules PLN-001 – PLN-006) and stages it for human review at H1; a rejected proposal is recorded with its reasons and never staged for review.',
-          evidence: [
-            {
-              path: PLANNER_DEF,
-              quote:
-                'Checked deterministically by G-SCHEMA (payload schema) and G-TRACE (Planner content)',
-            },
-            { path: `${VAL}/planner-guard.ts`, tracked: true },
-          ],
-        },
-        {
-          text: 'Offline only in v1: it reads a recorded model output and makes no model call.',
-          evidence: [
-            {
-              path: PLANNER_DEF,
-              quote:
-                'Offline only: `--fake-model-output` is required, and no live model call has been made.',
-            },
-            {
-              path: `${PLAN}/cli.ts`,
-              quote: 'Planner v1 is offline-only: --fake-model-output <file> is required',
-            },
-          ],
-        },
-      ],
-      code: {
-        text: 'Definition, output and payload schemas and prompt in agents/definitions/planner/; orchestrator in agents/orchestrator/planner/ (npm run agents:plan).',
-        evidence: [
-          { path: PLANNER_DEF, tracked: true },
-          { path: 'agents/definitions/planner/planner-output.schema.json', tracked: true },
-          { path: 'agents/definitions/planner/planner-payload.schema.json', tracked: true },
-          { path: 'agents/definitions/planner/prompt.md', tracked: true },
-          { path: `${PLAN}/plan.ts`, tracked: true },
-          { path: PACKAGE, quote: '"agents:plan": "tsx agents/orchestrator/planner/cli.ts"' },
-        ],
-      },
-      tests: {
-        text: 'Automated tests with a fake model: no provider is contacted. Part of the agent suite in CI.',
-        evidence: [
-          {
-            path: `${PLAN}/planner.test.ts`,
-            quote: 'The model is always a fake; no provider is contacted',
-          },
-          { path: PACKAGE, quote: 'agents/orchestrator/planner/planner.test.ts' },
-        ],
-      },
-      approval: {
-        text: 'H1: a staged proposal is reviewed by a human. There is no apply workflow; an accepted proposal reaches the test plan only as an ordinary, reviewed commit by a human.',
-        evidence: [
-          { path: PLANNER_DEF, quote: 'A staged proposal is reviewed by a human at gate **H1**.' },
-          {
-            path: PLANNER_DEF,
-            quote:
-              'There is no apply workflow: an approved proposal reaches `specs/<app>/test-plan.md` only as an ordinary, reviewed commit by a human',
-          },
-        ],
-      },
-    },
-    specifiedOnly(
-      'analyzer',
-      'Analyzer agent',
-      {
-        text: 'Defined in the Agent Standard: reads run evidence after execution and reports, citing the test, its tags, TC, REQ, the run and the evidence paths.',
-        evidence: [
-          {
-            path: STANDARD,
-            quote:
-              'Analyzer reports cite the test file, test title, tags, TC, REQ, the run and the evidence paths.',
-          },
-          { path: STANDARD, quote: '**Run evidence** — Analyzer and Healer only' },
-        ],
-      },
-      {
-        text: 'None: the standard needs no approval for Analyzer reports.',
-        evidence: [
-          {
-            path: STANDARD,
-            quote:
-              'No approval is needed for context discovery, Analyzer reports, validation runs, or discarding an artifact.',
-          },
-        ],
-      },
-    ),
-    {
-      id: 'healer',
-      name: 'Healer agent',
-      kind: 'AI agent',
-      status: 'implemented',
-      purpose: {
-        text: 'Diagnoses one Playwright test failure from explicitly supplied evidence and, when the evidence supports it, proposes a narrowly scoped repair for human review. It never applies a repair, never runs proposed code and never weakens or suppresses a test.',
-        evidence: [
-          {
-            path: HEALER_DEF,
-            quote:
-              'The Healer **diagnoses one Playwright test failure** from explicitly supplied evidence',
-          },
-          { path: STANDARD, quote: '| H3 | Healing patches, after validation (Healer) |' },
-        ],
-      },
-      responsibilities: [
-        {
-          text: 'Accepts only authentic failure evidence: a Playwright JSON report in which the selected, committed test failed; otherwise it stops before any model call.',
-          evidence: [{ path: HEALER_DEF, quote: '**Authentic failure evidence.**' }],
-        },
-        {
-          text: 'Treats logs and source as untrusted data: instruction-like text, credentials and personal data stop the run before any model call.',
-          evidence: [{ path: HEALER_DEF, quote: '**Untrusted text screen and secret scan.**' }],
-        },
-        {
-          text: 'Classifies the failure (test code, test data or setup, application defect, environment, insufficient evidence); an application defect is escalated as a defect candidate, never worked around.',
-          evidence: [
-            {
-              path: HEALER_DEF,
-              quote: 'An application defect is never worked around in test code',
-            },
-          ],
-        },
-        {
-          text: 'Checks every proposal deterministically (payload schema and rules HEA-001 – HEA-009: evidence, repair scope, no weakened checks, no suppression, no concealing waits, no claims); a repair is then validated without execution authorization.',
-          evidence: [
-            {
-              path: HEALER_DEF,
-              quote:
-                'Checked deterministically by G-SCHEMA (payload schema) and G-TRACE (Healer content)',
-            },
-            { path: `${VAL}/healer-guard.ts`, tracked: true },
-          ],
-        },
-        {
-          text: 'Offline only in v1: it reads a recorded model output and makes no model call.',
-          evidence: [
-            {
-              path: HEALER_DEF,
-              quote:
-                'Offline only: `--fake-model-output` is required, and no live model call has been made.',
-            },
-            {
-              path: `${HEAL}/cli.ts`,
-              quote: 'Healer v1 is offline-only: --fake-model-output <file> is required',
-            },
-          ],
-        },
-      ],
-      code: {
-        text: 'Definition, output and payload schemas and prompt in agents/definitions/healer/; orchestrator in agents/orchestrator/healer/ (npm run agents:heal).',
-        evidence: [
-          { path: HEALER_DEF, tracked: true },
-          { path: 'agents/definitions/healer/healer-output.schema.json', tracked: true },
-          { path: 'agents/definitions/healer/healer-payload.schema.json', tracked: true },
-          { path: 'agents/definitions/healer/prompt.md', tracked: true },
-          { path: `${HEAL}/heal.ts`, tracked: true },
-          { path: PACKAGE, quote: '"agents:heal": "tsx agents/orchestrator/healer/cli.ts"' },
-        ],
-      },
-      tests: {
-        text: 'Automated tests with a fake model and synthetic failure reports: no provider is contacted, nothing is applied. Part of the agent suite in CI.',
-        evidence: [
-          {
-            path: `${HEAL}/healer.test.ts`,
-            quote: 'The model is always a fake; no provider is contacted',
-          },
-          { path: PACKAGE, quote: 'agents/orchestrator/healer/healer.test.ts' },
-        ],
-      },
-      approval: {
-        text: 'A diagnosis needs no approval. A repair needs a human H7 authorization for its execution-capable guards (closed) and approval at H3 to be applied, as an ordinary reviewed commit.',
-        evidence: [
-          {
-            path: HEALER_DEF,
-            quote: 'A diagnosis is a report: no approval is needed to stage it.',
-          },
-          { path: HEALER_DEF, quote: 'and applying it needs gate **H3**' },
         ],
       },
     },
@@ -900,6 +893,8 @@ export function allEvidence(layer: AgentLayer): Evidence[] {
     layer.standard,
     layer.principle,
     layer.agentRoles,
+    layer.validatorRole,
+    layer.retired,
     ...layer.components.flatMap((c) => [
       c.purpose,
       ...c.responsibilities,

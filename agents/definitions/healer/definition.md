@@ -1,15 +1,16 @@
 # Healer Agent — definition
 
-definitionVersion: 1.0
+definitionVersion: 1.1
 
 | Item              | Value                                                          |
 | ----------------- | -------------------------------------------------------------- |
 | Agent             | `healer`                                                       |
-| Requires standard | Agent Standard 1.x ([standard.md](../../standard/standard.md)) |
+| Requires standard | Agent Standard 2.x ([standard.md](../../standard/standard.md)) |
 | Artifact type     | `heal-proposal`                                                |
 | Output schema     | [`healer-output.schema.json`](healer-output.schema.json)       |
 | Payload schema    | [`healer-payload.schema.json`](healer-payload.schema.json)     |
 | System prompt     | [`prompt.md`](prompt.md)                                       |
+| Revision          | 1.1: requires Agent Standard 2.x; nothing else changed (minor) |
 | Orchestrator      | `agents/orchestrator/healer/` (`npm run agents:heal`)          |
 
 The Healer **diagnoses one Playwright test failure** from explicitly supplied evidence and, when

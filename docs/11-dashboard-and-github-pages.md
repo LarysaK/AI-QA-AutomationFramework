@@ -9,15 +9,15 @@ All data is embedded **at build time** after validation; the browser makes no re
 
 ### Views (verified in [`Layout.tsx`](../reporting/dashboard/src/components/Layout.tsx))
 
-| View                       | Shows                                                                                          | Source                    |
-| -------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------- |
-| Overview                   | Key figures, linkage by requirement, latest execution results, coverage                        | Snapshot, CI history      |
-| Test Plan                  | The approved test plan, rendered                                                               | Snapshot                  |
-| Test Cases                 | All 96 test cases with filters; per test case its linked tests and, when available, CI results | Snapshot, CI history      |
-| Executions                 | Published CI runs, per-run details, coverage of CI runs                                        | CI history export         |
-| AI Agents                  | The agent layer: components, guards, gates H1–H7, H7 closed, what is not recorded              | Evidence-checked register |
-| Defects                    | An intentional empty state: no defect register is connected                                    | —                         |
-| How to read this dashboard | Definitions, provenance, what is deliberately not shown                                        | All                       |
+| View                       | Shows                                                                                                                       | Source                    |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| Overview                   | Key figures, linkage by requirement, latest execution results, coverage                                                     | Snapshot, CI history      |
+| Test Plan                  | The approved test plan, rendered                                                                                            | Snapshot                  |
+| Test Cases                 | All 96 test cases with filters; per test case its linked tests and, when available, CI results                              | Snapshot, CI history      |
+| Executions                 | Published CI runs, per-run details, coverage of CI runs                                                                     | CI history export         |
+| AI Agents                  | The three AI agents (all implemented), the Validator shown separately, guards, gates H1–H7, H7 closed, what is not recorded | Evidence-checked register |
+| Defects                    | An intentional empty state: no defect register is connected                                                                 | —                         |
+| How to read this dashboard | Definitions, provenance, what is deliberately not shown                                                                     | All                       |
 
 There is no separate _Requirements_ view: requirements and their linkage appear on the Overview
 and in each test case's details.
@@ -32,7 +32,9 @@ and in each test case's details.
    `DASHBOARD_REQUIRE_CI_HISTORY=1` makes a missing export fail the build.
 3. **Agent layer facts**: every statement on the AI Agents page carries evidence in committed
    files (a quotation, an absent path, a tracked file or an excluded text) and is checked at
-   build time against HEAD; any drift fails the build.
+   build time against HEAD; any drift fails the build. The AI agents shown must be exactly the
+   Agent Standard's agents (Planner, Generator, Healer); the Validator is shown separately and is
+   never counted, and the retired Analyzer is checked to have no committed files.
 
 Measures are kept apart on purpose: _planned_ (a test case exists), _automation intent_ (the
 plan's column), _linked_ (a committed test carries the tag) and _executed in CI_ (a published

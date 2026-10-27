@@ -293,8 +293,8 @@ describe('G-TRACE: passing', () => {
     const results = validateArtifact(
       {
         artifactType: 'test-proposal',
-        schemaVersion: '1.0',
-        standardVersion: '1.0',
+        schemaVersion: '2.0',
+        standardVersion: '2.0',
         agent: { name: 'generator', definitionVersion: '1.0' },
         taskId: 'trace-e2e',
         status: 'READY',

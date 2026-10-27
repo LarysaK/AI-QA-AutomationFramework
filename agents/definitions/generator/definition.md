@@ -1,14 +1,15 @@
 # Generator Agent — definition
 
-definitionVersion: 1.0
+definitionVersion: 1.1
 
 | Item              | Value                                                          |
 | ----------------- | -------------------------------------------------------------- |
 | Agent             | `generator`                                                    |
-| Requires standard | Agent Standard 1.x ([standard.md](../../standard/standard.md)) |
+| Requires standard | Agent Standard 2.x ([standard.md](../../standard/standard.md)) |
 | Artifact type     | `test-proposal`                                                |
 | Output schema     | [`generator-output.schema.json`](generator-output.schema.json) |
 | System prompt     | [`prompt.md`](prompt.md)                                       |
+| Revision          | 1.1: requires Agent Standard 2.x; nothing else changed (minor) |
 | Orchestrator      | `agents/orchestrator/generator/` (`npm run agents:generate`)   |
 
 The Generator proposes **exactly one new Playwright TypeScript test file** for one explicitly

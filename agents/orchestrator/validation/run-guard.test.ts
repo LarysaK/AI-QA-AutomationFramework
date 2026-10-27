@@ -706,8 +706,8 @@ describe('G-RUN in the guard pipeline', () => {
   const content = spec(...REVIEWER_CREATE(403));
   const envelope = {
     artifactType: 'test-proposal',
-    schemaVersion: '1.0',
-    standardVersion: '1.2',
+    schemaVersion: '2.0',
+    standardVersion: '2.0',
     agent: { name: 'generator', definitionVersion: '1.0' },
     taskId: 'run-auth',
     status: 'READY',

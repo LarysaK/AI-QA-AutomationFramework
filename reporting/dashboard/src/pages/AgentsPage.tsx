@@ -131,13 +131,18 @@ export function AgentsPage({
 }) {
   if (agents === null) return <NotIncluded />;
   const { layer, commit } = agents;
-  // Counts AI agents only (the standard's LLM-backed roles); the Validator is orchestrator code.
+  // Counts AI agents only (the standard's LLM-backed roles); the Validator is deterministic code
+  // and is never counted among them.
   const ai = layer.components.filter((c) => c.kind === 'AI agent');
   const implementedAi = ai.filter((c) => c.status === 'implemented');
   const specifiedAi = ai.filter((c) => c.status === 'specified-only');
-  const orchestrator = layer.components.filter((c) => c.kind === 'Deterministic orchestrator');
+  const validators = layer.components.filter((c) => c.kind === 'Deterministic validator');
   const names = (list: readonly Component[]) =>
-    list.map((c) => c.name.replace(/ agent$/, '')).join(', ');
+    naturalList(list.map((c) => c.name.replace(/ agent$/, '')));
+  const agentCount =
+    specifiedAi.length === 0
+      ? `All ${String(ai.length)} AI agents defined by the Agent Standard are implemented: ${names(implementedAi)}.`
+      : `Of the ${String(ai.length)} AI agents defined by the Agent Standard, implemented: ${names(implementedAi)}; specified only: ${names(specifiedAi)}.`;
   const executing = layer.guards.filter((g) => g.executionCapable);
   const m = layer.modelExecution;
 
@@ -169,7 +174,7 @@ export function AgentsPage({
         <Stat
           label="AI agents implemented"
           value={`${String(implementedAi.length)} of ${String(ai.length)}`}
-          detail={`Of the ${String(ai.length)} defined by the Agent Standard. Implemented: ${names(implementedAi)}. Specified only: ${names(specifiedAi)}. The ${names(orchestrator)} is deterministic code, not an AI agent.`}
+          detail={`${agentCount} The ${names(validators)} is deterministic code, not an AI agent, and is not counted.`}
         />
         <Stat
           label="Validation guards"
@@ -227,21 +232,15 @@ export function AgentsPage({
         </dl>
       </Card>
 
-      <Card title="Components">
+      <Card title="AI agents">
         <p className="card-intro">
-          {layer.agentRoles.text} The table lists all {String(layer.components.length)}:{' '}
-          {String(ai.length)} AI agents and the {names(orchestrator)}.
+          {layer.agentRoles.text} {layer.retired.text}
         </p>
-        <div
-          className="table-scroll"
-          role="region"
-          aria-label="Agent layer components"
-          tabIndex={0}
-        >
+        <div className="table-scroll" role="region" aria-label="AI agents" tabIndex={0}>
           <table className="data-table agent-table">
             <thead>
               <tr>
-                <th scope="col">Component</th>
+                <th scope="col">Agent</th>
                 <th scope="col">Status</th>
                 <th scope="col">Purpose</th>
                 <th scope="col">Code and tests</th>
@@ -249,7 +248,7 @@ export function AgentsPage({
               </tr>
             </thead>
             <tbody>
-              {layer.components.map((c) => (
+              {ai.map((c) => (
                 <tr key={c.id}>
                   <th scope="row">
                     {c.name}
@@ -271,7 +270,7 @@ export function AgentsPage({
             </tbody>
           </table>
         </div>
-        {layer.components
+        {ai
           .filter((c) => c.responsibilities.length > 0)
           .map((c) => (
             <section key={c.id} className="agent-duties">
@@ -284,6 +283,43 @@ export function AgentsPage({
             </section>
           ))}
       </Card>
+
+      {validators.map((c) => (
+        <Card key={c.id} title={`${c.name}: deterministic safety component`}>
+          <p className="card-intro">{layer.validatorRole.text}</p>
+          <dl className="definitions" aria-label={c.name}>
+            <div>
+              <dt>Status</dt>
+              <dd>
+                <Badge tone="neutral">{STATUS_LABEL[c.status]}</Badge> {c.kind}
+              </dd>
+            </div>
+            <div>
+              <dt>Purpose</dt>
+              <dd>{c.purpose.text}</dd>
+            </div>
+            <div>
+              <dt>Code and tests</dt>
+              <dd>
+                {c.code.text}
+                <span className="cell-note">Tests: {c.tests.text}</span>
+              </dd>
+            </div>
+            <div>
+              <dt>Human approval</dt>
+              <dd>{c.approval.text}</dd>
+            </div>
+          </dl>
+          <section className="agent-duties">
+            <h3 className="subheading">{c.name}: responsibilities</h3>
+            <ul className="plain-list">
+              {c.responsibilities.map((r) => (
+                <li key={r.text}>{r.text}</li>
+              ))}
+            </ul>
+          </section>
+        </Card>
+      ))}
 
       <Card title="Validation guards">
         <p className="card-intro">
@@ -369,7 +405,7 @@ export function AgentsPage({
         <p>
           {layer.standard.text} Each statement on this page cites committed files. When the
           dashboard is built, every quotation is checked against these files at commit{' '}
-          <code>{commit}</code>, absent components are checked to have no committed files, and the
+          <code>{commit}</code>, retired components are checked to have no committed files, and the
           guard and gate tables are checked to be the standard’s complete tables. If any statement
           no longer holds, the build fails.
         </p>

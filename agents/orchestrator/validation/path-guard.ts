@@ -11,7 +11,7 @@ import type {
 } from './types';
 
 /**
- * G-PATHS (STD-AUTH-002, STD-CAN-001): path classes from Agent Standard v1, section 6.2.
+ * G-PATHS (STD-AUTH-002, STD-CAN-001): path classes from Agent Standard v2, section 6.2.
  * Default deny: a change is allowed only if its path is in an allowed class and the agent,
  * changeKind and operation are permitted for that class.
  */

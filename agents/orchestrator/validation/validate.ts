@@ -35,7 +35,7 @@ export interface ValidationOptions {
   readonly executionAuthorization?: string;
 }
 
-/** Guards implemented so far, in the order fixed by Agent Standard v1, section 14. */
+/** Guards implemented so far, in the order fixed by Agent Standard v2, section 14. */
 export const GUARD_ORDER: readonly GuardName[] = [
   'G-SCHEMA',
   'G-PATHS',

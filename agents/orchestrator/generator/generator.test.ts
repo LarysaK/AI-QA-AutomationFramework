@@ -347,8 +347,8 @@ describe('READY proposals', () => {
     // Orchestrator-owned envelope fields.
     const artifact = readJson(join(taskDir, 'artifact.json'));
     assert.equal(artifact['artifactType'], 'test-proposal');
-    assert.equal(artifact['standardVersion'], '1.2');
-    assert.deepEqual(artifact['agent'], { name: 'generator', definitionVersion: '1.0' });
+    assert.equal(artifact['standardVersion'], '2.0');
+    assert.deepEqual(artifact['agent'], { name: 'generator', definitionVersion: '1.1' });
     assert.equal(artifact['taskId'], 'gen-tc-003-07-20261013T090000Z');
     assert.deepEqual(artifact['traceability'], {
       requirements: ['REQ-003'],
@@ -374,7 +374,7 @@ describe('READY proposals', () => {
       servedModel: 'fake-model',
       effort: 'medium',
       maxTokens: DEFAULT_MAX_TOKENS,
-      definitionVersion: '1.0',
+      definitionVersion: '1.1',
       requestedTestCase: 'TC-003-07',
       allowReferencedTestCase: false,
     });
@@ -410,7 +410,7 @@ describe('READY proposals', () => {
     assert.doesNotMatch(requestText, /sk-ant-test/);
     assert.doesNotMatch(
       requestText,
-      /Agent Standard v1\.2/,
+      /Agent Standard v2\.0/,
       'context text is not copied into request.json',
     );
     assert.equal(spy.requests[0]?.model, DEFAULT_MODEL);
@@ -575,7 +575,7 @@ describe('model-call provenance', () => {
       servedModel: 'fake-model-output',
       effort: null,
       maxTokens: null,
-      definitionVersion: '1.0',
+      definitionVersion: '1.1',
       requestedTestCase: 'TC-003-07',
       allowReferencedTestCase: false,
     });

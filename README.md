@@ -28,7 +28,7 @@ forbids runtime code from importing `agents/**` or an LLM SDK. See
 | CI           | GitHub Actions on every push and pull request to `main`; actions pinned to commit SHAs                                                                                                                                |
 | CI history   | One immutable, approval-gated record per CI run on `main`, on the `ci-history` branch, with read-only reconciliation                                                                                                  |
 | Dashboard    | Read-only, build-time data, strict CSP; published on GitHub Pages after each published CI record                                                                                                                      |
-| AI agents    | Planner, Generator and Healer agents and the deterministic Validator implemented; **no live model run yet; H7 closed**                                                                                                |
+| AI agents    | Three AI agents (Planner, Generator, Healer) and the deterministic Validator implemented; **no live model run yet; H7 closed**                                                                                        |
 
 ## Repository layout
 
@@ -62,7 +62,8 @@ CI, history and dashboard:
 
 Agent layer:
 
-- [x] [Agent Standard v1.2](agents/standard/standard.md) and the artifact envelope schema
+- [x] [Agent Standard v2.0](agents/standard/standard.md) (three agents) and the artifact envelope
+      schema 2.0
 - [x] Deterministic validator with seven guards and human execution authorization (H7)
 - [x] [Generator agent v1](docs/generator-agent.md): one new test per approved test case,
       staged and validated; demonstrated offline with a hand-written fixture (not model output)
@@ -78,19 +79,19 @@ Not implemented yet:
 
 - [ ] A live Generator run (real model output)
 - [ ] A live Planner or Healer run (both v1 agents are offline-only)
-- [ ] Analyzer agent — removed from the approved architecture; still named in Agent Standard
-      v1.2 until its revision
 - [ ] Proposal approval and apply workflow
 - [ ] Automation of the remaining test cases (73 not yet automated, 2 manual by design)
 - [ ] External integrations (Jira, Azure DevOps, GitHub, MCP)
 
 ## AI agent architecture
 
-Approved target architecture: **three AI agents**, **Planner**, **Generator** and **Healer**,
-and one **deterministic Validator**, which is not an AI agent. The standalone Analyzer agent has
-been removed from the plan. All three AI agents and the Validator are implemented, offline-only
-for the Planner and the Healer. The Agent Standard, its envelope schema and the Dashboard still describe the
-earlier four-agent design; their revision is a separate, pending change. Details and guardrails (H1–H7):
+[Agent Standard v2.0](agents/standard/standard.md) defines **three AI agents**, **Planner**,
+**Generator** and **Healer**, and one **deterministic Validator**, which is not an AI agent and is
+never counted as one. Failure diagnosis is part of the Healer; the standalone Analyzer agent of
+Standard 1.x is retired (it was never implemented). All three AI agents and the Validator are
+implemented and tested with a fake model only; the Planner and the Healer are offline-only. No
+live AI run has been made, **H7 is closed**, and nothing is executed or repaired autonomously.
+Details and guardrails (H1–H7):
 [AI Agent Architecture and Guardrails](docs/09-ai-agent-architecture-and-guardrails.md).
 
 ## Getting started
@@ -175,5 +176,5 @@ Start with the [documentation index](docs/README.md). Key documents:
 - [Known limitations, risks and roadmap](docs/13-limitations-risks-and-roadmap.md)
 
 Authoritative sources: [Requirements v1.2](specs/requestflow/requirements.md),
-[Test Plan v1](specs/requestflow/test-plan.md), [Agent Standard v1.2](agents/standard/standard.md),
+[Test Plan v1](specs/requestflow/test-plan.md), [Agent Standard v2.0](agents/standard/standard.md),
 [ADR-0001](docs/adr/0001-ai-outside-test-runtime.md), [Generator agent v1](docs/generator-agent.md).

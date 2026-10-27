@@ -331,8 +331,8 @@ export function assemblePlanEnvelope(
   ];
   return {
     artifactType: 'test-plan-proposal',
-    schemaVersion: '1.0',
-    standardVersion: '1.2',
+    schemaVersion: '2.0',
+    standardVersion: '2.0',
     agent: { name: 'planner', definitionVersion: meta.definitionVersion },
     taskId: meta.taskId,
     status: output.status,
