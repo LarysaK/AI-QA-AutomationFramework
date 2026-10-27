@@ -27,17 +27,17 @@ access to an AI provider, and the product tests never import the agent layer
  Agent layer: agents/standard · agents/definitions · agents/orchestrator
 ```
 
-| Path                                                                                                                              | Responsibility                                                                             | Status at the audit commit                                   |
-| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
-| [`specs/requestflow/`](../specs/requestflow/)                                                                                     | Requirements v1.2 and Test Plan v1: the behavioural source of truth                        | Implemented, frozen baseline                                 |
-| [`apps/requestflow/app/`](../apps/requestflow/app/)                                                                               | RequestFlow: server-rendered UI and JSON API, in-memory state                              | Implemented                                                  |
-| [`apps/requestflow/pages/`](../apps/requestflow/pages/), [`api/`](../apps/requestflow/api/), [`data/`](../apps/requestflow/data/) | Page objects, a thin API client, demo users                                                | Implemented                                                  |
-| [`tests/requestflow/`](../tests/requestflow/)                                                                                     | Playwright tests (API, UI, E2E)                                                            | 5 files, 30 test instances                                   |
-| [`agents/`](../agents/)                                                                                                           | Agent Standard, Generator definition, orchestrator (Generator and deterministic validator) | Planner, Generator and validator implemented; Healer planned |
-| [`reporting/dashboard-data/`](../reporting/dashboard-data/)                                                                       | Builds the validated dashboard snapshot from committed sources                             | Implemented                                                  |
-| [`reporting/ci/`](../reporting/ci/)                                                                                               | CI run records, hand-off, publisher, reconciliation, history export                        | Implemented                                                  |
-| [`reporting/dashboard/`](../reporting/dashboard/)                                                                                 | The read-only QA Dashboard (React, build-time data)                                        | Implemented; published on GitHub Pages (see K)               |
-| [`framework/`](../framework/), [`prompts/`](../prompts/), [`integrations/`](../integrations/)                                     | Planned shared runtime, prompt entry points and external integrations                      | **Planned: placeholders only** (`.gitkeep`)                  |
+| Path                                                                                                                              | Responsibility                                                                             | Status at the audit commit                           |
+| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| [`specs/requestflow/`](../specs/requestflow/)                                                                                     | Requirements v1.2 and Test Plan v1: the behavioural source of truth                        | Implemented, frozen baseline                         |
+| [`apps/requestflow/app/`](../apps/requestflow/app/)                                                                               | RequestFlow: server-rendered UI and JSON API, in-memory state                              | Implemented                                          |
+| [`apps/requestflow/pages/`](../apps/requestflow/pages/), [`api/`](../apps/requestflow/api/), [`data/`](../apps/requestflow/data/) | Page objects, a thin API client, demo users                                                | Implemented                                          |
+| [`tests/requestflow/`](../tests/requestflow/)                                                                                     | Playwright tests (API, UI, E2E)                                                            | 5 files, 30 test instances                           |
+| [`agents/`](../agents/)                                                                                                           | Agent Standard, Generator definition, orchestrator (Generator and deterministic validator) | Planner, Generator, Healer and validator implemented |
+| [`reporting/dashboard-data/`](../reporting/dashboard-data/)                                                                       | Builds the validated dashboard snapshot from committed sources                             | Implemented                                          |
+| [`reporting/ci/`](../reporting/ci/)                                                                                               | CI run records, hand-off, publisher, reconciliation, history export                        | Implemented                                          |
+| [`reporting/dashboard/`](../reporting/dashboard/)                                                                                 | The read-only QA Dashboard (React, build-time data)                                        | Implemented; published on GitHub Pages (see K)       |
+| [`framework/`](../framework/), [`prompts/`](../prompts/), [`integrations/`](../integrations/)                                     | Planned shared runtime, prompt entry points and external integrations                      | **Planned: placeholders only** (`.gitkeep`)          |
 
 ## Implemented today (verified)
 
@@ -49,8 +49,8 @@ access to an AI provider, and the product tests never import the agent layer
   `@TC-…` tags; all 30 passed in published CI run #23 at the audit commit.
 - The agent layer: Agent Standard v1.2, a seven-guard deterministic validator with human
   execution authorization (H7), Generator Agent v1, demonstrated **offline only** with a
-  hand-written fixture, and [Planner Agent v1](planner-agent.md), offline-only and tested with a
-  fake model. **No live AI model run has been made**, and H7 is closed.
+  hand-written fixture, [Planner Agent v1](planner-agent.md) and [Healer Agent v1](healer-agent.md), both offline-only
+  and tested with a fake model. **No live AI model run has been made**, and H7 is closed.
 - CI on GitHub Actions, an approval-gated CI history branch (`ci-history`) with 5 published run
   records, read-only reconciliation, and the QA Dashboard showing them.
 - The Dashboard's GitHub Pages deployment ([`pages.yml`](../.github/workflows/pages.yml), merged in
@@ -60,7 +60,7 @@ access to an AI provider, and the product tests never import the agent layer
 
 ## Planned, not implemented
 
-- A live Generator or Planner run; the Healer agent; a proposal approval and apply workflow.
+- A live Generator, Planner or Healer run; a proposal approval and apply workflow.
 - The **approved** agent architecture (three AI agents, Planner, Generator and Healer, plus the
   deterministic Validator; no separate Analyzer) as a formal revision: the committed Agent
   Standard, envelope schema, validator types and Dashboard still describe four AI agents,

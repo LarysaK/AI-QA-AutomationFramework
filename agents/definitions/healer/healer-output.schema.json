@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agents/definitions/healer/healer-output.schema.json",
+  "title": "Healer model output",
+  "description": "What the Healer model returns (definition 1.0). Uses only the JSON Schema subset supported by structured outputs; stricter rules are enforced on the assembled envelope by G-SCHEMA (healer-payload.schema.json) and G-TRACE (HEA rules).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "summary",
+    "diagnosis",
+    "repair",
+    "assumptions",
+    "findings",
+    "contextRequests"
+  ],
+  "properties": {
+    "status": { "enum": ["READY", "BLOCKED", "NEEDS_HUMAN_DECISION"] },
+    "summary": { "type": "string" },
+    "diagnosis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "classification",
+        "explanation",
+        "evidenceRefs",
+        "confidence",
+        "alternatives",
+        "missingEvidence",
+        "recommendedInvestigation"
+      ],
+      "properties": {
+        "classification": {
+          "enum": [
+            "test-code-issue",
+            "application-defect",
+            "environment-or-infrastructure",
+            "test-data-or-setup",
+            "insufficient-evidence"
+          ]
+        },
+        "explanation": { "type": "string" },
+        "evidenceRefs": { "type": "array", "items": { "type": "string" } },
+        "confidence": { "enum": ["low", "medium", "high"] },
+        "alternatives": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["classification", "explanation", "evidenceRefs"],
+            "properties": {
+              "classification": {
+                "enum": [
+                  "test-code-issue",
+                  "application-defect",
+                  "environment-or-infrastructure",
+                  "test-data-or-setup",
+                  "insufficient-evidence"
+                ]
+              },
+              "explanation": { "type": "string" },
+              "evidenceRefs": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "missingEvidence": { "type": "array", "items": { "type": "string" } },
+        "recommendedInvestigation": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "repair": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "changes",
+            "impact",
+            "expectedBehaviorPreserved",
+            "risks",
+            "validationSteps"
+          ],
+          "properties": {
+            "changes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "content", "rationale"],
+                "properties": {
+                  "path": { "type": "string" },
+                  "content": { "type": "string" },
+                  "rationale": { "type": "string" }
+                }
+              }
+            },
+            "impact": { "type": "string" },
+            "expectedBehaviorPreserved": { "type": "string" },
+            "risks": { "type": "array", "items": { "type": "string" } },
+            "validationSteps": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        { "type": "null" }
+      ]
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["statement", "impact"],
+        "properties": { "statement": { "type": "string" }, "impact": { "type": "string" } }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "severity", "message"],
+        "properties": {
+          "kind": {
+            "enum": [
+              "conflict",
+              "ambiguity",
+              "gap",
+              "missing-context",
+              "defect-candidate",
+              "deviation",
+              "novel-pattern",
+              "risk"
+            ]
+          },
+          "severity": { "enum": ["info", "warning", "blocking"] },
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "contextRequests": { "type": "array", "items": { "type": "string" } }
+  }
+}

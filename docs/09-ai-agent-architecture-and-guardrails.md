@@ -1,9 +1,9 @@
 # I. AI Agent Architecture and Guardrails
 
-> **Status.** Two AI agents, the **Generator** and the **Planner** (added in M7), and the
-> deterministic **validator** are implemented. Both agents run **offline only**: the Generator was
-> demonstrated with a hand-written fixture, and the Planner reads recorded outputs and is tested
-> with a fake model; neither has produced real model output. **No live AI model run has been made**, **H7 is
+> **Status.** All three AI agents, the **Generator**, the **Planner** (M7) and the **Healer** (M8),
+> and the deterministic **validator** are implemented. All agents run **offline only**: the Generator
+> was demonstrated with a hand-written fixture, and the Planner and the Healer read recorded outputs
+> and are tested with a fake model; none has produced real model output. **No live AI model run has been made**, **H7 is
 > closed** (no execution authorization is in effect or stored), and no AI-generated test has been
 > applied to the repository.
 
@@ -23,7 +23,7 @@ Playwright runtime never imports the agent layer or an LLM SDK (ESLint boundary)
 | Generator agent v1  | AI agent                                                          | Implemented; offline demonstration only                                                            | [`definition.md`](../agents/definitions/generator/definition.md), [`orchestrator/generator/`](../agents/orchestrator/generator/), [Generator Agent v1](generator-agent.md) |
 | Validator           | Deterministic orchestrator (no AI)                                | Implemented                                                                                        | [`orchestrator/validation/`](../agents/orchestrator/validation/)                                                                                                           |
 | Planner agent v1    | AI agent                                                          | Implemented; offline only, tested with a fake model; no live run                                   | [`definition.md`](../agents/definitions/planner/definition.md), [`orchestrator/planner/`](../agents/orchestrator/planner/), [Planner Agent v1](planner-agent.md)           |
-| Healer agent        | AI agent                                                          | **Planned** (approved architecture); specified in the Standard; no definition, no code             | Standard path classes, gate H3                                                                                                                                             |
+| Healer agent v1     | AI agent                                                          | Implemented; offline only, tested with a fake model and synthetic reports; no live run             | [`definition.md`](../agents/definitions/healer/definition.md), [`orchestrator/healer/`](../agents/orchestrator/healer/), [Healer Agent v1](healer-agent.md)                |
 | Analyzer agent      | AI agent                                                          | **Removed from the approved architecture**; still named in the committed Standard v1.2 (see below) | Standard §4, §5                                                                                                                                                            |
 
 ## Generator agent v1 (implemented)
@@ -55,6 +55,20 @@ PLN-001 – PLN-006), and stages it for human review at **H1**. It never writes 
 requirements, never approves, and never requests or supplies H7: a plan proposal contains no code.
 v1 is **offline-only** (`--fake-model-output` is required); no live Planner run has been made.
 
+## Healer agent v1 (implemented, offline)
+
+Diagnoses **one failed Playwright test** from its JSON report and, when the evidence supports it,
+proposes a **narrowly scoped repair** ([definition](../agents/definitions/healer/definition.md),
+[Healer Agent v1](healer-agent.md)). Evidence must be authentic (the test failed in a consistent
+report), is sanitized and screened for instructions and secrets before any model call, and is cited
+by ID. The diagnosis classifies the failure as a test-code issue, a test-data or setup problem, an
+application defect (escalated as a defect candidate, never worked around), an environment problem
+or insufficient evidence. A repair is allowed only for the first two, only as a `modify` of the
+failing test or a support file it imports, and it is rejected if it weakens a check, suppresses a
+test, or adds waits, timeouts or retries (rules HEA-001 – HEA-009 in G-TRACE). A repair is then
+validated without execution authorization: it waits for H7 (closed) and for H3. v1 is
+**offline-only**; no live Healer run has been made.
+
 ## Validator: seven deterministic guards
 
 Order and execution capability from the Standard's
@@ -81,15 +95,15 @@ fake model**; it makes no model calls.
 Verbatim from [Agent Standard §8](../agents/standard/standard.md#8-human-approval-gates), with the
 status of each gate in this repository.
 
-| Gate | Requires human approval                                                                                      | In this repository                                                                                                                                                     |
-| ---- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| H1   | Test-plan changes, including provisional TC IDs (Planner)                                                    | Reachable: the Planner stages proposals for human review; no apply workflow exists, so an accepted proposal reaches the test plan only as a reviewed commit by a human |
-| H2   | Generated test and support changes, after validation (Generator)                                             | No apply workflow exists; a proposal reaches `tests/` only as an ordinary, reviewed commit by a human                                                                  |
-| H3   | Healing patches, after validation (Healer)                                                                   | Not reachable: the Healer is not implemented                                                                                                                           |
-| H4   | Requirements changes — humans only; agents may only raise findings                                           | Requirements are a Protected path; G-PATHS denies them to every agent                                                                                                  |
-| H5   | Creating, changing or promoting a canonical test — humans only                                               | Files with a `@CAN-` test are Protected; G-TRACE rejects an agent-added `@CAN` tag                                                                                     |
-| H6   | Changes to this standard, agent definitions or ADRs — humans only                                            | `agents/**` and `docs/adr/**` are Protected paths                                                                                                                      |
-| H7   | Execution authorization: before any execution-capable guard runs proposed code for validation (STD-AUTH-005) | **Closed**                                                                                                                                                             |
+| Gate | Requires human approval                                                                                      | In this repository                                                                                                                                                                                                 |
+| ---- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| H1   | Test-plan changes, including provisional TC IDs (Planner)                                                    | Reachable: the Planner stages proposals for human review; no apply workflow exists, so an accepted proposal reaches the test plan only as a reviewed commit by a human                                             |
+| H2   | Generated test and support changes, after validation (Generator)                                             | No apply workflow exists; a proposal reaches `tests/` only as an ordinary, reviewed commit by a human                                                                                                              |
+| H3   | Healing patches, after validation (Healer)                                                                   | Reachable: the Healer stages healing patches; their execution-capable guards wait for H7 (closed), and no apply workflow exists, so an accepted repair reaches the repository only as a reviewed commit by a human |
+| H4   | Requirements changes — humans only; agents may only raise findings                                           | Requirements are a Protected path; G-PATHS denies them to every agent                                                                                                                                              |
+| H5   | Creating, changing or promoting a canonical test — humans only                                               | Files with a `@CAN-` test are Protected; G-TRACE rejects an agent-added `@CAN` tag                                                                                                                                 |
+| H6   | Changes to this standard, agent definitions or ADRs — humans only                                            | `agents/**` and `docs/adr/**` are Protected paths                                                                                                                                                                  |
+| H7   | Execution authorization: before any execution-capable guard runs proposed code for validation (STD-AUTH-005) | **Closed**                                                                                                                                                                                                         |
 
 ### H7 in detail
 
@@ -137,7 +151,7 @@ The project owner has **approved** this target architecture:
 | --- | ------------------- | ---------------------------------------- | ------------------------------------------------ |
 | 1   | **Planner agent**   | AI agent                                 | Implemented (v1, offline only; fake-model tests) |
 | 2   | **Generator agent** | AI agent                                 | Implemented (offline demonstration only)         |
-| 3   | **Healer agent**    | AI agent                                 | Planned                                          |
+| 3   | **Healer agent**    | AI agent                                 | Implemented (v1, offline only; fake-model tests) |
 | 4   | **Validator**       | Deterministic component, not an AI agent | Implemented                                      |
 
 The standalone **Analyzer agent has been removed** from the planned architecture.
@@ -152,7 +166,7 @@ the Analyzer, and this documentation-only change deliberately does not modify th
 | Envelope schema    | [`agents/standard/envelope.schema.json`](../agents/standard/envelope.schema.json)                                                                                            | The `agent.name` enum, and the `failure-analysis` artifact type, which the schema binds to the `analyzer` agent                                                           |
 | Validator types    | [`agents/orchestrator/validation/types.ts`](../agents/orchestrator/validation/types.ts)                                                                                      | `AgentName` includes `'analyzer'`                                                                                                                                         |
 | Dashboard register | [`reporting/dashboard/src/data/agents.ts`](../reporting/dashboard/src/data/agents.ts)                                                                                        | The AI Agents view lists the Analyzer as "Specified only", with evidence quoted from the Standard                                                                         |
-| Dashboard tests    | [`test/agents.test.tsx`](../reporting/dashboard/test/agents.test.tsx), [`test-node/agent-layer-plugin.test.ts`](../reporting/dashboard/test-node/agent-layer-plugin.test.ts) | Expect four AI agents ("2 of 4") and the Analyzer's absent paths                                                                                                          |
+| Dashboard tests    | [`test/agents.test.tsx`](../reporting/dashboard/test/agents.test.tsx), [`test-node/agent-layer-plugin.test.ts`](../reporting/dashboard/test-node/agent-layer-plugin.test.ts) | Expect four AI agents ("3 of 4") and the Analyzer's absent paths                                                                                                          |
 
 **Why it must be one controlled change.** The Standard is frozen (its status table), versioned by
 the rules of §15, and changed only by humans (gate H6). Removing an agent from the schema's enum
@@ -163,5 +177,5 @@ design.
 **Recommendation** (for a later milestone): a new Agent Standard version that removes the
 Analyzer and reassigns reading run evidence (for example to the Healer); the matching envelope
 schema version (the agent enum and the `failure-analysis` artifact type) and validator types; then the Dashboard register and its tests, so the AI Agents
-view shows "2 of 3". The root README already describes the approved architecture and labels the
+view shows "3 of 3". The root README already describes the approved architecture and labels the
 Standard revision as pending.

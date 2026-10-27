@@ -75,7 +75,7 @@ describe('AI Agents: model execution and H7', () => {
       within(card).getByText(name, { selector: 'dt' }).nextElementSibling?.textContent ?? '';
 
     expect(term('Implemented agent code')).toMatch(
-      /^Generator agent, Validator and Planner agent are implemented\./,
+      /^Generator agent, Validator, Planner agent and Healer agent are implemented\./,
     );
     expect(term('Implemented agent code')).toContain('never run in CI');
 
@@ -162,19 +162,19 @@ describe('AI Agents: components, guards and gates', () => {
       Validator: 'Implemented',
       'Planner agent': 'Implemented',
       'Analyzer agent': 'Specified only',
-      'Healer agent': 'Specified only',
+      'Healer agent': 'Implemented',
     });
-    for (const name of ['Analyzer agent', 'Healer agent']) {
+    for (const name of ['Analyzer agent']) {
       const row = rows.find((r) => r.textContent.startsWith(name));
       expect(row?.textContent).toContain(
         'Not implemented: no agent definition and no orchestrator code.',
       );
     }
     const stats = within(screen.getByLabelText('Agent layer status'));
-    expect(stats.getByText('AI agents implemented').nextElementSibling?.textContent).toBe('2 of 4');
+    expect(stats.getByText('AI agents implemented').nextElementSibling?.textContent).toBe('3 of 4');
   });
 
-  test('"2 of 4" counts the standard\'s four AI agents; the Validator is listed but not counted', async () => {
+  test('"3 of 4" counts the standard\'s four AI agents; the Validator is listed but not counted', async () => {
     await renderAgents();
     // Five components: four AI agents (the standard's LLM-backed roles) and the Validator.
     const rows = rowsOf('Agent layer components');
@@ -188,7 +188,7 @@ describe('AI Agents: components, guards and gates', () => {
     ).parentElement as HTMLElement;
     const detail = stat.querySelector('.stat-detail')?.textContent;
     expect(detail).toBe(
-      'Of the 4 defined by the Agent Standard. Implemented: Generator, Planner. Specified only: Analyzer, Healer. The Validator is deterministic code, not an AI agent.',
+      'Of the 4 defined by the Agent Standard. Implemented: Generator, Planner, Healer. Specified only: Analyzer. The Validator is deterministic code, not an AI agent.',
     );
     expect(mainText()).toContain(
       'The Agent Standard defines four AI agents, each an LLM-backed role: Planner, Generator, Analyzer and Healer.',
@@ -258,7 +258,7 @@ describe('AI Agents: nothing fabricated', () => {
     expect(text).not.toMatch(/authorized by|approved by/i);
     // The only figures: counts of the register's own components and guards, and two statuses.
     const values = [...screen.getByLabelText('Agent layer status').querySelectorAll('.stat-value')];
-    expect(values.map((v) => v.textContent)).toEqual(['2 of 4', '7', 'Closed', 'None']);
+    expect(values.map((v) => v.textContent)).toEqual(['3 of 4', '7', 'Closed', 'None']);
   });
 
   test('cites committed files as evidence, and names the commit they were checked at', async () => {
@@ -276,12 +276,7 @@ describe('AI Agents: nothing fabricated', () => {
     )
       .getAllByRole('listitem')
       .map((li) => li.textContent);
-    expect(absent).toEqual([
-      'agents/definitions/analyzer',
-      'agents/definitions/healer',
-      'agents/orchestrator/analyzer',
-      'agents/orchestrator/healer',
-    ]);
+    expect(absent).toEqual(['agents/definitions/analyzer', 'agents/orchestrator/analyzer']);
     expect(listed.filter((path) => absent.includes(path))).toEqual(absent);
     expect(listed.every((path) => !path.startsWith('/') && !path.includes('..'))).toBe(true);
   });
