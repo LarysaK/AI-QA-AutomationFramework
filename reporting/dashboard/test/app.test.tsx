@@ -148,6 +148,13 @@ describe('Test Case Explorer', () => {
     choose('Automation linkage', 'linked');
     expect(testCaseRows()).toHaveLength(summary.linkedTestCases);
     choose('Requirement', 'REQ-007');
+    expect(testCaseRows()).toHaveLength(
+      snapshot.testCases.filter(
+        (tc) => tc.requirementId === 'REQ-007' && tc.automationLinkage.status === 'linked',
+      ).length,
+    );
+    // Manual-by-design test cases are never linked, so this combination is empty.
+    choose('Automation intent', 'No');
     expect(screen.getByText('No test cases match these filters.')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(testCaseRows()).toHaveLength(summary.testCases);
