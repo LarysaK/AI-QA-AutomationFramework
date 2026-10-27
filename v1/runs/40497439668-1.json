@@ -1,0 +1,380 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "ci-run",
+  "repository": "LarysaK/AI-QA-AutomationFramework",
+  "workflow": "CI",
+  "job": "Verify",
+  "run": {
+    "id": 40497439668,
+    "attempt": 1,
+    "number": 23,
+    "url": "https://github.com/LarysaK/AI-QA-AutomationFramework/actions/runs/40497439668"
+  },
+  "trigger": {
+    "event": "push",
+    "ref": "refs/heads/main"
+  },
+  "commitSha": "76246404d874a5a0919f81e228139fa905d17829",
+  "status": "completed",
+  "conclusion": "success",
+  "timestamps": {
+    "runCreatedAt": "2026-10-27T11:36:41Z",
+    "jobStartedAt": "2026-10-27T11:36:43Z",
+    "jobCompletedAt": "2026-10-27T11:43:14Z"
+  },
+  "environment": {
+    "runnerLabel": "ubuntu-24.04",
+    "node": "22.23.3",
+    "playwright": "1.63.0"
+  },
+  "steps": [
+    {
+      "name": "Check out",
+      "conclusion": "success"
+    },
+    {
+      "name": "Set up Node.js (.nvmrc)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Check Node.js version",
+      "conclusion": "success"
+    },
+    {
+      "name": "Guard (no model credentials, no staged proposals)",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare CI report folder",
+      "conclusion": "success"
+    },
+    {
+      "name": "Install root dependencies",
+      "conclusion": "success"
+    },
+    {
+      "name": "Install Playwright Chromium and system dependencies",
+      "conclusion": "success"
+    },
+    {
+      "name": "Generate dashboard snapshot",
+      "conclusion": "success"
+    },
+    {
+      "name": "Typecheck",
+      "conclusion": "success"
+    },
+    {
+      "name": "Lint",
+      "conclusion": "success"
+    },
+    {
+      "name": "Format check",
+      "conclusion": "success"
+    },
+    {
+      "name": "Agent validation and generator tests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Dashboard data tests",
+      "conclusion": "success"
+    },
+    {
+      "name": "CI run record tests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Install dashboard dependencies",
+      "conclusion": "success"
+    },
+    {
+      "name": "Dashboard typecheck",
+      "conclusion": "success"
+    },
+    {
+      "name": "Dashboard lint",
+      "conclusion": "success"
+    },
+    {
+      "name": "Dashboard tests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Dashboard build",
+      "conclusion": "success"
+    },
+    {
+      "name": "Playwright tests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Collect suite results",
+      "conclusion": "success"
+    },
+    {
+      "name": "Stage dashboard snapshot",
+      "conclusion": "success"
+    },
+    {
+      "name": "Upload dashboard snapshot",
+      "conclusion": "success"
+    },
+    {
+      "name": "Stage suite results",
+      "conclusion": "success"
+    },
+    {
+      "name": "Upload suite results",
+      "conclusion": "success"
+    }
+  ],
+  "suites": [
+    {
+      "id": "agents",
+      "state": "passed",
+      "counts": {
+        "passed": 176,
+        "failed": 0,
+        "flaky": null,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0,
+        "total": 176
+      },
+      "durationMs": 229517,
+      "startedAt": null
+    },
+    {
+      "id": "dashboard-data",
+      "state": "passed",
+      "counts": {
+        "passed": 60,
+        "failed": 0,
+        "flaky": null,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0,
+        "total": 60
+      },
+      "durationMs": 2540,
+      "startedAt": null
+    },
+    {
+      "id": "dashboard-frontend",
+      "state": "passed",
+      "counts": {
+        "passed": 158,
+        "failed": 0,
+        "flaky": null,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": null,
+        "total": 158
+      },
+      "durationMs": null,
+      "startedAt": "2026-10-27T11:42:42.492Z"
+    },
+    {
+      "id": "playwright",
+      "state": "passed",
+      "counts": {
+        "passed": 30,
+        "failed": 0,
+        "flaky": 0,
+        "skipped": 0,
+        "todo": null,
+        "cancelled": null,
+        "total": 30
+      },
+      "durationMs": 4700,
+      "startedAt": "2026-10-27T11:43:05.708Z"
+    }
+  ],
+  "playwright": {
+    "failOnFlakyTests": false,
+    "globalErrors": 0,
+    "results": [
+      {
+        "instanceId": "087c0c5daaf3eaace47a-22d711a040c319d80aff",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "087c0c5daaf3eaace47a-695ceee24d333d8f1b27",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "087c0c5daaf3eaace47a-a6eacbb62fbd50bea1fe",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "0e5cd8cf2b0905c1f51a-951d48748bcdfde8685b",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-0029740d66f14f48a6bf",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-081a80f537ce0cd7bad3",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-0e36bec6bd261e50f34e",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-28e84d34aa59dd14a6d2",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-2af64a9e4742cb0070cf",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-304cb5c111d0e8b08791",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-4341e019a3ce5e8955a1",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-50018e4efa6bf594d35d",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-53c592e8ecb8600ca7b3",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-55879742c377c405bc84",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-7e7bca9699870643cf14",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-985b945458062a36a736",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-9b0ed3d196e2789e2cf9",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-9e6e5e39f4f9bd4817de",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-a2ff678d294fe5059bf4",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-a6b88d437de6c3072e37",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-bbb63565d826abc0b399",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-bd237da79beb63ec7e63",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-c39bc49b4b1bce49f0ea",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-cb88917b902dd5ef9609",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-d486fd8111a13da2db4a",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-ded6cff1eccdc326a426",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-ec36eb666b349ae3c95c",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "1061e5c39dd1405d2468-f62c47037ea17fba3b15",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "41cbdbb58a8f35bcb11b-3d0e63f8994afaf3507e",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      },
+      {
+        "instanceId": "ecbdf010184b3bc3f097-7c494ef8bacad9964b74",
+        "project": "chromium",
+        "status": "passed",
+        "attempts": 1
+      }
+    ]
+  }
+}
