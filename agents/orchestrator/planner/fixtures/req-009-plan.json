@@ -17,8 +17,8 @@
   ],
   "automationCandidates": [
     {
-      "testCaseId": "TC-009-06",
-      "rationale": "P0 authorization rule (Reviewer gets 403), deterministic and cheap through the API; no committed test references it."
+      "testCaseId": "TC-009-03",
+      "rationale": "List response shape with full Request representations; deterministic through the API; no committed test references it."
     },
     {
       "testCaseId": "TC-009-07",

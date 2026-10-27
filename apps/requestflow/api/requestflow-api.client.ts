@@ -34,17 +34,32 @@ export interface ApiErrorBody {
 export class RequestFlowApi {
   constructor(private readonly request: APIRequestContext) {}
 
+  /** POST /api/auth/login, returning the raw response; for tests of login itself. */
+  login(userId: string): Promise<APIResponse> {
+    return this.request.post('/api/auth/login', { data: { userId } });
+  }
+
   /** Logs in through POST /api/auth/login. Fails fast, because it is a test precondition. */
   async loginAs(user: DemoUser): Promise<void> {
-    const response = await this.request.post('/api/auth/login', { data: { userId: user.id } });
+    const response = await this.login(user.id);
     if (!response.ok()) {
       throw new Error(`Login as ${user.id} failed with HTTP ${String(response.status())}`);
     }
   }
 
+  /** POST /api/auth/logout. */
+  logout(): Promise<APIResponse> {
+    return this.request.post('/api/auth/logout');
+  }
+
   /** POST /api/requests. The payload is untyped on purpose so tests can send invalid input. */
   createRequest(payload: Record<string, unknown>): Promise<APIResponse> {
     return this.request.post('/api/requests', { data: payload });
+  }
+
+  /** GET /api/requests — the authenticated Employee's own requests. */
+  listRequests(): Promise<APIResponse> {
+    return this.request.get('/api/requests');
   }
 
   getRequest(id: string): Promise<APIResponse> {
@@ -58,5 +73,25 @@ export class RequestFlowApi {
 
   submitRequest(id: string): Promise<APIResponse> {
     return this.request.patch(`/api/requests/${encodeURIComponent(id)}/submit`);
+  }
+
+  /** PATCH /api/requests/:id/approve. The payload is optional and untyped, as for createRequest. */
+  approveRequest(id: string, payload?: Record<string, unknown>): Promise<APIResponse> {
+    return this.request.patch(
+      `/api/requests/${encodeURIComponent(id)}/approve`,
+      payload === undefined ? {} : { data: payload },
+    );
+  }
+
+  /** PATCH /api/requests/:id/reject. Untyped payload, as for createRequest. */
+  rejectRequest(id: string, payload: Record<string, unknown>): Promise<APIResponse> {
+    return this.request.patch(`/api/requests/${encodeURIComponent(id)}/reject`, {
+      data: payload,
+    });
+  }
+
+  /** GET /api/review-queue. */
+  reviewQueue(): Promise<APIResponse> {
+    return this.request.get('/api/review-queue');
   }
 }

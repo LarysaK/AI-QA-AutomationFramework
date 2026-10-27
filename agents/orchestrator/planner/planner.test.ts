@@ -270,7 +270,7 @@ describe('Planner: accepted proposals (staged for human review at H1)', () => {
     assert.deepEqual(artifact['proposedChanges'], []);
     assert.deepEqual(artifact['traceability'], {
       requirements: ['REQ-009'],
-      testCases: ['TC-009-02', 'TC-009-06', 'TC-009-07'],
+      testCases: ['TC-009-02', 'TC-009-03', 'TC-009-07'],
     });
     const payload = artifact['payload'] as Json;
     assert.equal(payload['reviewGate'], 'H1');
@@ -327,7 +327,7 @@ describe('Planner: accepted proposals (staged for human review at H1)', () => {
         proposal(),
       ],
       automationCandidates: [
-        { testCaseId: 'TC-007-02', rationale: 'Deterministic precedence check.' },
+        { testCaseId: 'TC-007-03', rationale: 'Deterministic precedence check.' },
       ],
     });
     const spy: Spy = { requests: [] };
@@ -337,7 +337,7 @@ describe('Planner: accepted proposals (staged for human review at H1)', () => {
     const artifact = readJson(join(result.taskDir ?? '', 'artifact.json'));
     assert.deepEqual(artifact['traceability'], {
       requirements: ['REQ-007', 'REQ-009'],
-      testCases: ['TC-007-02', 'TC-007-07', 'TC-009-02'],
+      testCases: ['TC-007-03', 'TC-007-07', 'TC-009-02'],
     });
     const request = spy.requests[0];
     assert.ok(request);
@@ -347,7 +347,7 @@ describe('Planner: accepted proposals (staged for human review at H1)', () => {
     );
     assert.match(
       request.task,
-      /TC-007-01 \(Automation: Yes; referenced by committed tests: none\)/,
+      /TC-007-03 \(Automation: Yes; referenced by committed tests: none\)/,
     );
     assert.match(request.task, /TC-009-05 \(Automation: No;/);
   });
