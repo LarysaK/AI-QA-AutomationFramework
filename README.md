@@ -28,7 +28,7 @@ forbids runtime code from importing `agents/**` or an LLM SDK. See
 | CI           | GitHub Actions on every push and pull request to `main`; actions pinned to commit SHAs                                                                                                                                |
 | CI history   | One immutable, approval-gated record per CI run on `main`, on the `ci-history` branch, with read-only reconciliation                                                                                                  |
 | Dashboard    | Read-only, build-time data, strict CSP; published on GitHub Pages after each published CI record                                                                                                                      |
-| AI agents    | Generator agent and deterministic Validator implemented; **no live model run yet; H7 closed**                                                                                                                         |
+| AI agents    | Planner and Generator agents and the deterministic Validator implemented; **no live model run yet; H7 closed**                                                                                                        |
 
 ## Repository layout
 
@@ -66,12 +66,15 @@ Agent layer:
 - [x] Deterministic validator with seven guards and human execution authorization (H7)
 - [x] [Generator agent v1](docs/generator-agent.md): one new test per approved test case,
       staged and validated; demonstrated offline with a hand-written fixture (not model output)
+- [x] [Planner agent v1](docs/planner-agent.md): test-planning proposals (provisional test
+      cases, automation candidates) for approved requirements, checked deterministically and
+      staged for human review at H1; offline only, tested with a fake model
 - [x] ESLint import boundary: runtime code cannot import `agents/**` or the LLM SDK
 
 Not implemented yet:
 
 - [ ] A live Generator run (real model output)
-- [ ] Planner agent
+- [ ] A live Planner run (Planner v1 is offline-only)
 - [ ] Healer agent
 - [ ] Analyzer agent — removed from the approved architecture; still named in Agent Standard
       v1.2 until its revision
@@ -83,9 +86,9 @@ Not implemented yet:
 
 Approved target architecture: **three AI agents**, **Planner**, **Generator** and **Healer**,
 and one **deterministic Validator**, which is not an AI agent. The standalone Analyzer agent has
-been removed from the plan. Today only the Generator and the Validator are implemented. The Agent
-Standard, its envelope schema and the Dashboard still describe the earlier four-agent design;
-their revision is a separate, pending change. Details and guardrails (H1–H7):
+been removed from the plan. Today the Planner, the Generator and the Validator are implemented;
+the Healer is planned. The Agent Standard, its envelope schema and the Dashboard still describe the
+earlier four-agent design; their revision is a separate, pending change. Details and guardrails (H1–H7):
 [AI Agent Architecture and Guardrails](docs/09-ai-agent-architecture-and-guardrails.md).
 
 ## Getting started
@@ -142,18 +145,19 @@ screenshots and videos of failed tests go to `artifacts/` (gitignored). Details:
 
 ### Available scripts
 
-| Script                                                        | Purpose                                                                        |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `npm run aut:start`                                           | Start RequestFlow locally                                                      |
-| `npm test` / `npm run test:headed`                            | Playwright tests, headless / headed                                            |
-| `npm run typecheck` / `npm run lint` / `npm run format:check` | Quality gates                                                                  |
-| `npm run format`                                              | Format with Prettier                                                           |
-| `npm run agents:test`                                         | Agent layer tests (fake model; no model calls)                                 |
-| `npm run agents:validate`                                     | Validate an agent artifact (seven guards; H7 by `--authorize-execution`)       |
-| `npm run agents:generate`                                     | Generate one test proposal for an approved test case (live mode calls a model) |
-| `npm run dashboard:data`                                      | Build the validated dashboard snapshot                                         |
-| `npm run dashboard:history`                                   | Export the published CI history for the dashboard                              |
-| `npm run dashboard:test` / `npm run ci:test`                  | Dashboard data and CI record tests                                             |
+| Script                                                        | Purpose                                                                                    |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `npm run aut:start`                                           | Start RequestFlow locally                                                                  |
+| `npm test` / `npm run test:headed`                            | Playwright tests, headless / headed                                                        |
+| `npm run typecheck` / `npm run lint` / `npm run format:check` | Quality gates                                                                              |
+| `npm run format`                                              | Format with Prettier                                                                       |
+| `npm run agents:test`                                         | Agent layer tests (fake model; no model calls)                                             |
+| `npm run agents:validate`                                     | Validate an agent artifact (seven guards; H7 by `--authorize-execution`)                   |
+| `npm run agents:generate`                                     | Generate one test proposal for an approved test case (live mode calls a model)             |
+| `npm run agents:plan`                                         | Propose test-planning additions for approved requirements (offline: `--fake-model-output`) |
+| `npm run dashboard:data`                                      | Build the validated dashboard snapshot                                                     |
+| `npm run dashboard:history`                                   | Export the published CI history for the dashboard                                          |
+| `npm run dashboard:test` / `npm run ci:test`                  | Dashboard data and CI record tests                                                         |
 
 ## Documentation
 

@@ -101,9 +101,9 @@ describe('agent layer: drift fails', () => {
   });
 
   test('a component that is stated absent but now has committed files', () => {
-    const files = filesWith({}, ['agents/orchestrator/planner/plan.ts']);
+    const files = filesWith({}, ['agents/orchestrator/healer/heal.ts']);
     expect(verifyAgentLayer(AGENT_LAYER, files)).toContain(
-      'agents/orchestrator/planner: expected no committed files',
+      'agents/orchestrator/healer: expected no committed files',
     );
   });
 
@@ -132,7 +132,7 @@ describe('agent layer: drift fails', () => {
 
   test('a README checkbox that is ticked (a live run, a new agent)', () => {
     const readme = real.read('README.md') ?? '';
-    for (const item of ['A live Generator run (real model output)', 'Planner agent']) {
+    for (const item of ['A live Generator run (real model output)', 'Healer agent']) {
       const ticked = readme.replace(`- [ ] ${item}`, `- [x] ${item}`);
       expect(verifyAgentLayer(AGENT_LAYER, filesWith({ 'README.md': ticked }))).toContain(
         'README.md: quoted text not found',

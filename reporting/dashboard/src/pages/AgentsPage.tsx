@@ -52,6 +52,13 @@ function Sources({ fact }: { fact: Fact }) {
   );
 }
 
+/** "A", "A and B", "A, B and C". */
+function naturalList(items: readonly string[]): string {
+  return items.length <= 1
+    ? (items[0] ?? '')
+    : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1] ?? ''}`;
+}
+
 const STATUS_LABEL: Readonly<Record<Component['status'], string>> = {
   implemented: 'Implemented',
   'specified-only': 'Specified only',
@@ -186,10 +193,9 @@ export function AgentsPage({
           <div>
             <dt>Implemented agent code</dt>
             <dd>
-              {layer.components
-                .filter((c) => c.status === 'implemented')
-                .map((c) => c.name)
-                .join(' and ')}{' '}
+              {naturalList(
+                layer.components.filter((c) => c.status === 'implemented').map((c) => c.name),
+              )}{' '}
               are implemented. {m.liveModeInCode.text} <Sources fact={m.liveModeInCode} />
             </dd>
           </div>

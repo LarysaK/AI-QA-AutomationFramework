@@ -100,16 +100,18 @@ const ADR = 'docs/adr/0001-ai-outside-test-runtime.md';
 const CI = '.github/workflows/ci.yml';
 const PACKAGE = 'package.json';
 const GEN = 'agents/orchestrator/generator';
+const PLAN = 'agents/orchestrator/planner';
+const PLANNER_DEF = 'agents/definitions/planner/definition.md';
 const VAL = 'agents/orchestrator/validation';
 
-const notImplemented = (agent: 'planner' | 'analyzer' | 'healer', label: string): Evidence[] => [
+const notImplemented = (agent: 'analyzer' | 'healer', label: string): Evidence[] => [
   { path: `agents/definitions/${agent}`, absent: true },
   { path: `agents/orchestrator/${agent}`, absent: true },
   { path: README, quote: `- [ ] ${label} agent` },
 ];
 
 const specifiedOnly = (
-  id: 'planner' | 'analyzer' | 'healer',
+  id: 'analyzer' | 'healer',
   name: string,
   purpose: Fact,
   approval: Fact,
@@ -362,12 +364,15 @@ export const AGENT_LAYER: AgentLayer = {
         ],
       },
     },
-    specifiedOnly(
-      'planner',
-      'Planner agent',
-      {
-        text: 'Defined in the Agent Standard: proposes test-plan changes, and is the only agent that may propose new (provisional) test-case IDs, approved only through gate H1.',
+    {
+      id: 'planner',
+      name: 'Planner agent',
+      kind: 'AI agent',
+      status: 'implemented',
+      purpose: {
+        text: 'Proposes test-planning additions for explicitly selected, approved requirements: new test cases with provisional IDs and suggested automation candidates. It never changes the requirements or the test plan and never approves its own proposal.',
         evidence: [
+          { path: PLANNER_DEF, quote: 'The Planner proposes **test-planning additions**' },
           {
             path: STANDARD,
             quote:
@@ -375,16 +380,79 @@ export const AGENT_LAYER: AgentLayer = {
           },
         ],
       },
-      {
-        text: 'H1 for test-plan changes.',
+      responsibilities: [
+        {
+          text: 'Treats the selected requirement and test-plan text as untrusted data: instruction-like text stops the run before any model call.',
+          evidence: [{ path: PLANNER_DEF, quote: '**Untrusted text screen.**' }],
+        },
+        {
+          text: 'Builds a deterministic context pack of at most 64 KB, never truncated, with a manifest of every source.',
+          evidence: [
+            {
+              path: PLANNER_DEF,
+              quote: '## Context selection (deterministic; hard limit 64 KB; no truncation)',
+            },
+          ],
+        },
+        {
+          text: 'Checks every proposal deterministically (payload schema and rules PLN-001 – PLN-006) and stages it for human review at H1; a rejected proposal is recorded with its reasons and never staged for review.',
+          evidence: [
+            {
+              path: PLANNER_DEF,
+              quote:
+                'Checked deterministically by G-SCHEMA (payload schema) and G-TRACE (Planner content)',
+            },
+            { path: `${VAL}/planner-guard.ts`, tracked: true },
+          ],
+        },
+        {
+          text: 'Offline only in v1: it reads a recorded model output and makes no model call.',
+          evidence: [
+            {
+              path: PLANNER_DEF,
+              quote:
+                'Offline only: `--fake-model-output` is required, and no live model call has been made.',
+            },
+            {
+              path: `${PLAN}/cli.ts`,
+              quote: 'Planner v1 is offline-only: --fake-model-output <file> is required',
+            },
+          ],
+        },
+      ],
+      code: {
+        text: 'Definition, output and payload schemas and prompt in agents/definitions/planner/; orchestrator in agents/orchestrator/planner/ (npm run agents:plan).',
+        evidence: [
+          { path: PLANNER_DEF, tracked: true },
+          { path: 'agents/definitions/planner/planner-output.schema.json', tracked: true },
+          { path: 'agents/definitions/planner/planner-payload.schema.json', tracked: true },
+          { path: 'agents/definitions/planner/prompt.md', tracked: true },
+          { path: `${PLAN}/plan.ts`, tracked: true },
+          { path: PACKAGE, quote: '"agents:plan": "tsx agents/orchestrator/planner/cli.ts"' },
+        ],
+      },
+      tests: {
+        text: 'Automated tests with a fake model: no provider is contacted. Part of the agent suite in CI.',
         evidence: [
           {
-            path: STANDARD,
-            quote: '| H1 | Test-plan changes, including provisional TC IDs (Planner) |',
+            path: `${PLAN}/planner.test.ts`,
+            quote: 'The model is always a fake; no provider is contacted',
+          },
+          { path: PACKAGE, quote: 'agents/orchestrator/planner/planner.test.ts' },
+        ],
+      },
+      approval: {
+        text: 'H1: a staged proposal is reviewed by a human. There is no apply workflow; an accepted proposal reaches the test plan only as an ordinary, reviewed commit by a human.',
+        evidence: [
+          { path: PLANNER_DEF, quote: 'A staged proposal is reviewed by a human at gate **H1**.' },
+          {
+            path: PLANNER_DEF,
+            quote:
+              'There is no apply workflow: an approved proposal reaches `specs/<app>/test-plan.md` only as an ordinary, reviewed commit by a human',
           },
         ],
       },
-    ),
+    },
     specifiedOnly(
       'analyzer',
       'Analyzer agent',
@@ -520,8 +588,11 @@ export const AGENT_LAYER: AgentLayer = {
       id: 'H1',
       requires: 'Test-plan changes, including provisional TC IDs (Planner)',
       here: {
-        text: 'Not reachable: the Planner is not implemented.',
-        evidence: notImplemented('planner', 'Planner'),
+        text: 'Reachable: the Planner stages test-plan proposals for a human to review. No apply workflow exists; an accepted proposal reaches the test plan only as an ordinary, reviewed commit by a human.',
+        evidence: [
+          { path: PLANNER_DEF, quote: 'A staged proposal is reviewed by a human at gate **H1**.' },
+          { path: README, quote: '- [ ] Proposal approval and apply workflow' },
+        ],
       },
     },
     {
@@ -643,7 +714,7 @@ export const AGENT_LAYER: AgentLayer = {
       ],
     },
     fakeModelTests: {
-      text: 'The agent suite in CI (Agent validation and generator tests) runs the validator’s deterministic tests and the Generator’s tests with a fake model.',
+      text: 'The agent suite in CI (Agent validation and generator tests) runs the validator’s deterministic tests and the Generator’s and the Planner’s tests with a fake model.',
       evidence: [
         { path: CI, quote: '- name: Agent validation and generator tests' },
         { path: CI, quote: 'npm run --silent agents:test | tee artifacts/ci/agents.tap' },
@@ -651,6 +722,11 @@ export const AGENT_LAYER: AgentLayer = {
           path: `${GEN}/generator.test.ts`,
           quote: 'The model is always a fake; no provider is contacted.',
         },
+        {
+          path: `${PLAN}/planner.test.ts`,
+          quote: 'The model is always a fake; no provider is contacted',
+        },
+        { path: PACKAGE, quote: 'agents/orchestrator/planner/planner.test.ts' },
       ],
     },
     liveRuns: {

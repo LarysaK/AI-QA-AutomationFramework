@@ -175,6 +175,56 @@ export function parseTestPlan(markdown: string): ParsedTestPlan {
   return { testCases, canonicals, errors };
 }
 
+/** One approved test-case row of a test plan, with its cells keyed by the table's header. */
+export interface TestPlanRow {
+  readonly testCase: string;
+  readonly requirement: string;
+  readonly cells: Readonly<Record<string, string>>;
+}
+
+/**
+ * The approved test-case rows of a test plan, read with the same structure as parseTestPlan
+ * (inventory sections and first cells), plus each row's cells by header name. Read-only; callers
+ * must still check parseTestPlan's errors before trusting the IDs.
+ */
+export function parseTestPlanRows(markdown: string): Map<string, TestPlanRow> {
+  const rows = new Map<string, TestPlanRow>();
+  const lines = markdown.split('\n');
+  let section: string | undefined;
+  let header: string[] | undefined;
+  for (const [index, line] of lines.entries()) {
+    if (/^#{1,3}\s/.test(line)) {
+      section = REQ_SECTION.exec(line)?.[1];
+      header = undefined;
+      continue;
+    }
+    if (!TABLE_ROW.test(line)) {
+      header = undefined;
+      continue;
+    }
+    if (TABLE_SEPARATOR.test(line)) {
+      header = tableCells(lines[index - 1] ?? '');
+      continue;
+    }
+    const cells = tableCells(line);
+    const id = cells[0] ?? '';
+    if (section === undefined || header === undefined || !TC_ID.test(id) || rows.has(id)) continue;
+    const named: Record<string, string> = {};
+    header.forEach((name, i) => {
+      named[name] = cells[i] ?? '';
+    });
+    rows.set(id, { testCase: id, requirement: section, cells: named });
+  }
+  return rows;
+}
+
+function tableCells(line: string): string[] {
+  return line
+    .split('|')
+    .slice(1, -1)
+    .map((cell) => cell.trim());
+}
+
 /** Directories under specs/ that contain a requirements.md, in a stable order. */
 function findSpecDirs(repoRoot: string): string[] {
   const specs = join(repoRoot, 'specs');

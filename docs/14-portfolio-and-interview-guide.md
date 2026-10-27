@@ -74,8 +74,8 @@ in-memory server cannot guarantee under parallel runs (plan §6).
 
 **"What would you do next?"** Automate the P0 API cases of REQ-007, REQ-009 and REQ-010, resolve
 the TC-002-02 deviation, revise the agent architecture (Planner, Generator, Healer and the
-Validator, without an Analyzer) through a versioned Standard change, and implement the Planner
-and the Healer.
+Validator, without an Analyzer) through a versioned Standard change, make a first, reviewed
+live Planner run, and implement the Healer.
 
 ## Do not claim
 
@@ -83,5 +83,5 @@ and the Healer.
 - Real defect records or a defect rate.
 - Manual test execution results.
 - That the dashboard updates live: it is a static build, refreshed only by a new deployment.
-- That the Planner or Healer exist: they are planned in the approved architecture.
+- That the Healer exists (it is planned), or that the Planner has run live (v1 is offline-only).
 - Full requirement coverage, or coverage of REQ-007, REQ-009 or REQ-010 by automated tests.

@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import ts from 'typescript';
 
 import type { ApprovedIdsResult } from './approved-ids';
+import { checkPlanProposal, type PlanArtifact } from './planner-guard';
 import type { Artifact, GuardFailure, GuardResult, ProposedChange } from './types';
 
 /**
@@ -16,6 +17,7 @@ import type { Artifact, GuardFailure, GuardResult, ProposedChange } from './type
  * - A test file's REQ/TC IDs (read from its string literals) equal its declared traceability.
  *   The exact runtime Playwright tags are G-DISCOVERY's job.
  * - Proposed content never contains a `@CAN-` tag; a modified test keeps its REQ/TC IDs.
+ * - A Planner test-plan proposal follows the Planner rules PLN-001 – PLN-006 (planner-guard.ts).
  *
  * Read-only: proposed content is parsed in memory, never written.
  */
@@ -96,6 +98,11 @@ export function checkTrace(
     }
   }
 
+  // Planner content rules: proposals, provisional IDs, criteria, candidates, claims, provenance.
+  if (artifact.artifactType === 'test-plan-proposal') {
+    failures.push(...checkPlanProposal(artifact as unknown as PlanArtifact, ids, repoRoot));
+  }
+
   // 2. A Generator test proposal carries approved traceability.
   if (artifact.artifactType === 'test-proposal') {
     if (
@@ -122,7 +129,7 @@ export function checkTrace(
       }
     }
 
-    if (changeKind === 'plan-change') continue; // the plan legitimately names IDs; Planner payload not yet validated
+    if (changeKind === 'plan-change') continue; // the plan legitimately names IDs (Planner v1 proposes none: PLN-001)
 
     // 3. No proposed content may claim canonical status.
     const literalIds = idsInStringLiterals(change.content, path);

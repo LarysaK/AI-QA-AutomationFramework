@@ -122,6 +122,13 @@ function printAuthorizationGuidance(document: unknown, artifactFile: string, sha
   const changes =
     (document as { proposedChanges?: readonly { path: string }[] }).proposedChanges ?? [];
   console.log(`Artifact SHA-256: ${sha256}`);
+  if (changes.length === 0) {
+    // For example a Planner test-plan proposal: there is no proposed code, so there is nothing
+    // that H7 could authorize. No authorization command is offered.
+    console.log('The artifact proposes no files: there is no proposed code to execute.');
+    console.log('Do not authorize execution (H7) for it; it is reviewed at its approval gate.');
+    return;
+  }
   console.log('Proposed files that execution-capable guards would load:');
   for (const change of changes) console.log(`  ${change.path}`);
   console.log('Review the artifact. To authorize execution of its proposed code, run:');

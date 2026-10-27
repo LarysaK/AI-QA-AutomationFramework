@@ -5,21 +5,69 @@ import Ajv2020, { type ErrorObject } from 'ajv/dist/2020';
 import type { Artifact, GuardFailure, GuardResult } from './types';
 
 /**
- * G-SCHEMA (STD-ART-001): the artifact is a schema-valid envelope.
- * Payload schemas do not exist yet in v1, so only the envelope is validated.
+ * Payload schemas by artifact type (Agent Standard section 14: G-SCHEMA validates the envelope,
+ * and the payload once a payload schema exists). Paths are relative to the repository root.
+ * Artifact types without an entry have no payload schema yet; only their envelope is validated.
  */
-export function createSchemaGuard(schemaPath: string): (document: unknown) => GuardResult {
-  const schema = JSON.parse(readFileSync(schemaPath, 'utf8')) as object;
-  // strictRequired is off: it flags conditional `required` keywords that are valid JSON Schema.
-  const ajv = new Ajv2020({ allErrors: true, strict: true, strictRequired: false });
-  const validate = ajv.compile(schema);
+export const PAYLOAD_SCHEMA_PATHS: Readonly<Record<string, string>> = {
+  'test-plan-proposal': 'agents/definitions/planner/planner-payload.schema.json',
+};
+
+/**
+ * G-SCHEMA (STD-ART-001): the artifact is a schema-valid envelope, and its payload is valid
+ * against its agent's payload schema when one is given for its artifact type.
+ */
+export function createSchemaGuard(
+  schemaPath: string,
+  payloadSchemaPaths: Readonly<Record<string, string>> = {},
+): (document: unknown) => GuardResult {
+  const compile = (path: string): ReturnType<Ajv2020['compile']> =>
+    // strictRequired is off: it flags conditional `required` keywords that are valid JSON Schema.
+    new Ajv2020({ allErrors: true, strict: true, strictRequired: false }).compile(
+      JSON.parse(readFileSync(path, 'utf8')) as object,
+    );
+  const validate = compile(schemaPath);
+  // Compiled on first use, so artifacts of other types never depend on these files. A payload
+  // schema that is listed but cannot be loaded fails the artifact (fail closed).
+  const payloadValidators = new Map<string, ReturnType<Ajv2020['compile']> | string>();
+  const payloadValidator = (type: string): ReturnType<Ajv2020['compile']> | string | undefined => {
+    const path = payloadSchemaPaths[type];
+    if (path === undefined) return undefined;
+    if (!payloadValidators.has(type)) {
+      try {
+        payloadValidators.set(type, compile(path));
+      } catch {
+        payloadValidators.set(type, `the payload schema for ${type} cannot be loaded`);
+      }
+    }
+    return payloadValidators.get(type);
+  };
 
   return (document) => {
-    if (validate(document)) return { guard: 'G-SCHEMA', status: 'passed', failures: [] };
-    const failures = (validate.errors ?? [])
-      // `if` errors only say "must match then schema"; the real cause is reported separately.
-      .filter((error) => error.keyword !== 'if')
-      .map(toFailure);
+    if (!validate(document)) {
+      const failures = (validate.errors ?? [])
+        // `if` errors only say "must match then schema"; the real cause is reported separately.
+        .filter((error) => error.keyword !== 'if')
+        .map(toFailure);
+      return { guard: 'G-SCHEMA', status: 'failed', failures: dedupe(failures) };
+    }
+    const { artifactType, payload } = document as { artifactType: string; payload: unknown };
+    const validatePayload = payloadValidator(artifactType);
+    if (typeof validatePayload === 'string') {
+      return {
+        guard: 'G-SCHEMA',
+        status: 'failed',
+        failures: [
+          { guard: 'G-SCHEMA', ruleIds: ['STD-ART-001'], reason: `/payload ${validatePayload}` },
+        ],
+      };
+    }
+    if (validatePayload === undefined || validatePayload(payload)) {
+      return { guard: 'G-SCHEMA', status: 'passed', failures: [] };
+    }
+    const failures = (validatePayload.errors ?? []).map((error) =>
+      toFailure({ ...error, instancePath: `/payload${error.instancePath}` }),
+    );
     return { guard: 'G-SCHEMA', status: 'failed', failures: dedupe(failures) };
   };
 }

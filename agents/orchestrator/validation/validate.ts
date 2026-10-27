@@ -4,7 +4,7 @@ import { loadApprovedIds } from './approved-ids';
 import { checkBase } from './base-guard';
 import { checkDiscovery, type ListRunner } from './discovery-guard';
 import { checkPaths } from './path-guard';
-import { createSchemaGuard, isValidatedArtifact } from './schema-guard';
+import { createSchemaGuard, isValidatedArtifact, PAYLOAD_SCHEMA_PATHS } from './schema-guard';
 import { checkRun, type TestRunner } from './run-guard';
 import { checkStatic, type ScriptRunner } from './static-guard';
 import { checkTrace, type TraceArtifact } from './trace-guard';
@@ -58,6 +58,7 @@ export type ValidationOutcome = 'passed' | 'failed' | 'incomplete';
 export function validateArtifact(document: unknown, options: ValidationOptions): GuardResult[] {
   const schemaGuard = createSchemaGuard(
     options.schemaPath ?? resolve(options.repoRoot, ENVELOPE_SCHEMA_PATH),
+    payloadSchemas(options.repoRoot),
   );
 
   const results: GuardResult[] = [schemaGuard(document)];
@@ -131,6 +132,13 @@ export function outcomeOf(results: readonly GuardResult[]): ValidationOutcome {
     (guard) => results.find((result) => result.guard === guard)?.status === 'passed',
   );
   return allPassed ? 'passed' : 'incomplete';
+}
+
+/** The payload schemas of this repository, as absolute paths. */
+export function payloadSchemas(repoRoot: string): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(PAYLOAD_SCHEMA_PATHS).map(([type, path]) => [type, resolve(repoRoot, path)]),
+  );
 }
 
 function authorizationProblem(options: ValidationOptions): string | undefined {
