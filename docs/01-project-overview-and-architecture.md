@@ -32,7 +32,7 @@ access to an AI provider, and the product tests never import the agent layer
 | [`specs/requestflow/`](../specs/requestflow/)                                                                                     | Requirements v1.2 and Test Plan v1: the behavioural source of truth                        | Implemented, frozen baseline                         |
 | [`apps/requestflow/app/`](../apps/requestflow/app/)                                                                               | RequestFlow: server-rendered UI and JSON API, in-memory state                              | Implemented                                          |
 | [`apps/requestflow/pages/`](../apps/requestflow/pages/), [`api/`](../apps/requestflow/api/), [`data/`](../apps/requestflow/data/) | Page objects, a thin API client, demo users                                                | Implemented                                          |
-| [`tests/requestflow/`](../tests/requestflow/)                                                                                     | Playwright tests (API, UI, E2E)                                                            | 5 files, 30 test instances                           |
+| [`tests/requestflow/`](../tests/requestflow/)                                                                                     | Playwright tests (API, UI, E2E)                                                            | 8 files, 55 test instances                           |
 | [`agents/`](../agents/)                                                                                                           | Agent Standard, agent definitions, orchestrator (three agents and deterministic validator) | Planner, Generator, Healer and validator implemented |
 | [`reporting/dashboard-data/`](../reporting/dashboard-data/)                                                                       | Builds the validated dashboard snapshot from committed sources                             | Implemented                                          |
 | [`reporting/ci/`](../reporting/ci/)                                                                                               | CI run records, hand-off, publisher, reconciliation, history export                        | Implemented                                          |
@@ -45,8 +45,10 @@ access to an AI provider, and the product tests never import the agent layer
   lifecycle, server-side validation and authorization, and demo cookie authentication.
 - The approved human test plan: **96 test cases** for **10 requirements**, and **5 canonical
   reference tests** (CAN-001 – CAN-005), automated and passing.
-- **30 committed Playwright test instances** in 5 files, linked to **21** test cases by
-  `@TC-…` tags; all 30 passed in published CI run #23 at the audit commit.
+- **55 committed Playwright test instances** in 8 files, linked to **33** test cases by
+  `@TC-…` tags (P0: 14 of 38). The 30 tests of the audit commit all passed in published CI run
+  #23; the M10B API tests passed locally and have no published CI result yet (see
+  [E](05-automation-coverage-matrix.md)).
 - The agent layer: Agent Standard v2.0 with exactly three AI agents (Planner, Generator, Healer)
   and the deterministic Validator, which is not an AI agent; a seven-guard validator with human
   execution authorization (H7); Generator Agent v1, demonstrated **offline only** with a

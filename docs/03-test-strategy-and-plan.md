@@ -41,11 +41,11 @@ how it is organized and how it is applied; the plan itself remains the authority
 
 ## Priorities (plan §1.5)
 
-| Priority | Meaning                                                                             | Test cases |              Automated |
-| -------- | ----------------------------------------------------------------------------------- | ---------: | ---------------------: |
-| P0       | Core workflow, authentication or authorization; a failure blocks release of the AUT |         38 |                      4 |
-| P1       | Validation, boundaries, state-transition errors and atomicity                       |         50 | 16 (+1 to investigate) |
-| P2       | Contract details, ordering and low-risk edge cases                                  |          8 |                      0 |
+| Priority | Meaning                                                                             | Test cases | Automated |
+| -------- | ----------------------------------------------------------------------------------- | ---------: | --------: |
+| P0       | Core workflow, authentication or authorization; a failure blocks release of the AUT |         38 |        14 |
+| P1       | Validation, boundaries, state-transition errors and atomicity                       |         50 |        19 |
+| P2       | Contract details, ordering and low-risk edge cases                                  |          8 |         0 |
 
 ## Test design techniques used
 
