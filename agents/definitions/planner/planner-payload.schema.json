@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agents/definitions/planner/planner-payload.schema.json",
+  "title": "Planner payload",
+  "description": "The payload of a test-plan-proposal artifact (Planner definition 1.0). Validated by G-SCHEMA together with the envelope. Proposed test cases are not approved: they carry provisional IDs and await human review at gate H1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "modelCall",
+    "requestedModel",
+    "servedModel",
+    "effort",
+    "maxTokens",
+    "definitionVersion",
+    "requestedRequirements",
+    "reviewGate",
+    "proposedTestCases",
+    "automationCandidates"
+  ],
+  "properties": {
+    "modelCall": { "enum": ["anthropic-api", "offline-recorded-output"] },
+    "requestedModel": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+    "servedModel": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "effort": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] },
+    "maxTokens": { "anyOf": [{ "type": "integer", "minimum": 1 }, { "type": "null" }] },
+    "definitionVersion": { "type": "string", "pattern": "^\\d+\\.\\d+$" },
+    "requestedRequirements": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^REQ-\\d{3}$" }
+    },
+    "reviewGate": {
+      "description": "The human approval gate a proposal needs (Agent Standard section 8). Never passed by the Planner.",
+      "const": "H1"
+    },
+    "proposedTestCases": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provisionalId",
+          "requirementId",
+          "scenario",
+          "level",
+          "type",
+          "priority",
+          "automationCandidate",
+          "rationale",
+          "acceptanceCriteria",
+          "relatedTestCases"
+        ],
+        "properties": {
+          "provisionalId": {
+            "description": "Provisional, never approved: PTC-<requirement number>-<sequence>.",
+            "type": "string",
+            "pattern": "^PTC-\\d{3}-\\d{2}$"
+          },
+          "requirementId": { "type": "string", "pattern": "^REQ-\\d{3}$" },
+          "scenario": { "type": "string", "minLength": 10, "maxLength": 500 },
+          "level": { "enum": ["API", "UI", "E2E"] },
+          "type": { "enum": ["Positive", "Negative", "Boundary", "Authorization"] },
+          "priority": { "enum": ["P0", "P1", "P2"] },
+          "automationCandidate": { "type": "boolean" },
+          "rationale": { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "acceptanceCriteria": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "items": { "type": "string", "minLength": 10, "maxLength": 600 }
+          },
+          "relatedTestCases": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 20,
+            "items": { "type": "string", "pattern": "^TC-\\d{3}-\\d{2}$" }
+          }
+        }
+      }
+    },
+    "automationCandidates": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["testCaseId", "rationale"],
+        "properties": {
+          "testCaseId": { "type": "string", "pattern": "^TC-\\d{3}-\\d{2}$" },
+          "rationale": { "type": "string", "minLength": 1, "maxLength": 1000 }
+        }
+      }
+    }
+  }
+}

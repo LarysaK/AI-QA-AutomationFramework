@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agents/definitions/planner/planner-output.schema.json",
+  "title": "Planner model output",
+  "description": "What the Planner model returns (definition 1.0). Uses only the JSON Schema subset supported by structured outputs; stricter rules are enforced on the assembled envelope by G-SCHEMA (planner-payload.schema.json) and G-TRACE (PLN rules).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "summary",
+    "proposedTestCases",
+    "automationCandidates",
+    "assumptions",
+    "findings",
+    "contextRequests"
+  ],
+  "properties": {
+    "status": { "enum": ["READY", "BLOCKED", "NEEDS_HUMAN_DECISION"] },
+    "summary": { "type": "string" },
+    "proposedTestCases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provisionalId",
+          "requirementId",
+          "scenario",
+          "level",
+          "type",
+          "priority",
+          "automationCandidate",
+          "rationale",
+          "acceptanceCriteria",
+          "relatedTestCases"
+        ],
+        "properties": {
+          "provisionalId": { "type": "string" },
+          "requirementId": { "type": "string" },
+          "scenario": { "type": "string" },
+          "level": { "enum": ["API", "UI", "E2E"] },
+          "type": { "enum": ["Positive", "Negative", "Boundary", "Authorization"] },
+          "priority": { "enum": ["P0", "P1", "P2"] },
+          "automationCandidate": { "type": "boolean" },
+          "rationale": { "type": "string" },
+          "acceptanceCriteria": { "type": "array", "items": { "type": "string" } },
+          "relatedTestCases": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "automationCandidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["testCaseId", "rationale"],
+        "properties": {
+          "testCaseId": { "type": "string" },
+          "rationale": { "type": "string" }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["statement", "impact"],
+        "properties": {
+          "statement": { "type": "string" },
+          "impact": { "type": "string" }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "severity", "message"],
+        "properties": {
+          "kind": {
+            "enum": [
+              "conflict",
+              "ambiguity",
+              "gap",
+              "missing-context",
+              "defect-candidate",
+              "deviation",
+              "novel-pattern",
+              "risk"
+            ]
+          },
+          "severity": { "enum": ["info", "warning", "blocking"] },
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "contextRequests": { "type": "array", "items": { "type": "string" } }
+  }
+}

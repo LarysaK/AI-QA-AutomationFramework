@@ -36,6 +36,7 @@ Existing documents that remain authoritative and are linked, not copied:
 - [Agent Standard v1.2](../agents/standard/standard.md) (frozen agent contract)
 - [ADR-0001: AI agents are outside the deterministic Playwright runtime](adr/0001-ai-outside-test-runtime.md)
 - [Generator Agent v1](generator-agent.md)
+- [Planner Agent v1](planner-agent.md)
 - [QA Dashboard README](../reporting/dashboard/README.md)
 
 ## Recommended reading order

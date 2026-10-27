@@ -60,6 +60,25 @@ export function checkOutput(
   response: ModelResponse,
   schema: Record<string, unknown>,
 ): GeneratorOutput {
+  const checked = parseModelOutput(response, schema) as GeneratorOutput;
+  if (checked.status === 'READY' && checked.testFile === null) {
+    throw new OutputRejected(['status READY requires exactly one test file']);
+  }
+  if (checked.status !== 'READY' && checked.testFile !== null) {
+    throw new OutputRejected([`status ${checked.status} must not propose a test file`]);
+  }
+  return checked;
+}
+
+/**
+ * The checks every agent's structured output passes, shared by the Generator and the Planner:
+ * a normal stop (no refusal, no `max_tokens`), valid JSON, and the agent's output schema.
+ * Nothing is repaired; any problem rejects the output with its reasons.
+ */
+export function parseModelOutput(
+  response: ModelResponse,
+  schema: Record<string, unknown>,
+): unknown {
   if (response.stopReason === 'refusal')
     throw new OutputRejected(['the model refused (stop_reason "refusal")']);
   if (response.stopReason === 'max_tokens') {
@@ -86,14 +105,7 @@ export function checkOutput(
       ),
     );
   }
-  const checked = output as GeneratorOutput;
-  if (checked.status === 'READY' && checked.testFile === null) {
-    throw new OutputRejected(['status READY requires exactly one test file']);
-  }
-  if (checked.status !== 'READY' && checked.testFile !== null) {
-    throw new OutputRejected([`status ${checked.status} must not propose a test file`]);
-  }
-  return checked;
+  return output;
 }
 
 export interface EnvelopeMeta {

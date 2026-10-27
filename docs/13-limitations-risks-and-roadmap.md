@@ -27,7 +27,8 @@ No duplicate test-case IDs, orphan tests, unknown tags or broken TC/REQ tag pair
 - **One browser.** Only the `chromium` project is configured.
 - **Manual results.** There is no store for manual execution results; none are recorded.
 - **Defects.** No register or tracker; see [L](12-defect-management-and-reporting.md).
-- **AI.** The Generator has never run against a live model; real output quality is unverified.
+- **AI.** Neither the Generator nor the Planner has run against a live model; real output quality
+  is unverified. Planner v1 is offline-only.
   H7 is a human checkpoint, not a sandbox. Authorizations are not audited.
 - **CI history.** Seven early CI runs predate the publisher and will never have records.
   Publication needs a human approval per run.
@@ -55,7 +56,7 @@ Likelihood and impact are this audit's assessment, not measured values.
    envelope schema, validator types and Dashboard changes.
 4. **First live Generator run**, reviewed by a human, with its provenance recorded; H7 opened
    only per artifact, by a human.
-5. **Planner agent**, then **Healer agent** with an assertion-weakening guard.
+5. **Healer agent** with an assertion-weakening guard (Planner v1 is implemented, offline-only, in M7).
 6. **Proposal approval and apply workflow** (H2) with an audited record of approvals.
 7. **GitHub Pages**: done (merged in pull request #11; live, owner-confirmed). Remaining: observe further automatic refreshes and confirm the `github-pages` environment branch rule.
 8. **Isolated test state** to automate TC-004-07 and TC-009-05.
