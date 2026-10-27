@@ -1,11 +1,11 @@
 import { resolve } from 'node:path';
 
 import react from '@vitejs/plugin-react';
-import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 import { verifiedAgentLayer } from './build/agent-layer-plugin';
 import { validatedHistory } from './build/history-plugin';
+import { contentSecurityPolicy, notFoundPage, resolveBase } from './build/site';
 import { validatedSnapshot } from './build/snapshot-plugin';
 
 /**
@@ -21,40 +21,8 @@ const REPO_ROOT = resolve(import.meta.dirname, '../..');
 const SNAPSHOT_FILE = resolve(REPO_ROOT, 'artifacts/dashboard/dashboard-data.json');
 const HISTORY_FILE = resolve(REPO_ROOT, 'artifacts/dashboard/ci-history.json');
 
-/**
- * Production pages get a strict Content-Security-Policy: same-origin scripts and styles only, no
- * inline code, no network requests, and no external images or fonts. The app is a static bundle
- * with the snapshot embedded, so it never fetches anything. (Not applied to the dev server, whose
- * React refresh runtime needs an inline script and whose HMR client needs a WebSocket.)
- *
- * Delivered as a <meta> tag, which cannot carry `frame-ancestors` (anti-framing); that requires
- * an HTTP response header from the host. See README.md.
- */
-const CONTENT_SECURITY_POLICY = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self'",
-  "img-src 'self'",
-  "font-src 'self'",
-  "connect-src 'none'",
-  "object-src 'none'",
-  "base-uri 'none'",
-  "form-action 'none'",
-].join('; ');
-
-function contentSecurityPolicy(): Plugin {
-  return {
-    name: 'content-security-policy',
-    apply: 'build',
-    transformIndexHtml: () => [
-      {
-        tag: 'meta',
-        attrs: { 'http-equiv': 'Content-Security-Policy', content: CONTENT_SECURITY_POLICY },
-        injectTo: 'head-prepend',
-      },
-    ],
-  };
-}
+/** `./` by default; the GitHub Pages workflow sets the repository subpath (build/site.ts). */
+const BASE = resolveBase(process.env['DASHBOARD_BASE']);
 
 export default defineConfig({
   plugins: [
@@ -63,9 +31,9 @@ export default defineConfig({
     validatedHistory({ historyFile: HISTORY_FILE, repoRoot: REPO_ROOT }),
     verifiedAgentLayer({ repoRoot: REPO_ROOT }),
     contentSecurityPolicy(),
+    notFoundPage(BASE),
   ],
-  // Relative asset URLs, so the static build works from any sub-path.
-  base: './',
+  base: BASE,
   build: {
     outDir: resolve(import.meta.dirname, '../../artifacts/dashboard-site'),
     emptyOutDir: true,

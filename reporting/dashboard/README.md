@@ -110,5 +110,119 @@ connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'
 
 A `<meta>` policy **cannot** set `frame-ancestors`, so it does not prevent other sites from
 framing the dashboard. That needs an HTTP response header (`Content-Security-Policy:
-frame-ancestors 'none'`, or `X-Frame-Options: DENY`) set by the host. Whether the chosen host can
-set custom response headers has to be checked when the deployment target is decided.
+frame-ancestors 'none'`, or `X-Frame-Options: DENY`) set by the host. GitHub Pages does not allow
+custom response headers, so the published dashboard can be framed by other sites. The dashboard
+has no forms, sign-in or actions to trick a user into, which keeps the impact low; a host with
+custom headers would be needed to close it.
+
+## Publishing on GitHub Pages
+
+The dashboard is published at **https://larysak.github.io/AI-QA-AutomationFramework/** by
+[`.github/workflows/pages.yml`](../../.github/workflows/pages.yml). It is the same static,
+read-only build as locally: the data is embedded at build time, the browser makes no requests,
+and the CSP is unchanged.
+
+### When it is deployed
+
+- **Automatically**, after a run of the `CI history` workflow on `main` that composed **and
+  published** a run record. That workflow runs after each CI run on `main` and, once its
+  publication is approved, adds the run's record to `ci-history`; the redeploy then includes it.
+  The `gate` job ([`reporting/ci/pages-gate.mjs`](../ci/pages-gate.mjs)) reads the triggering
+  run's jobs (read-only) and requires both `Compose run record` and `Publish run record` to have
+  succeeded.
+  - A **product test failure** is recorded and published like any other CI run, so it **is**
+    deployed: the dashboard then shows the failed run.
+  - A **CI history run** that failed, was cancelled or skipped, or published nothing (publish
+    skipped, for example because the record already exists) is **not** deployed. A publication
+    that is awaiting approval has not completed, so the deployment waits for it; a rejected one
+    fails that run.
+  - If the gate cannot read the jobs, it fails the run instead of guessing.
+- **Manually**, with _Run workflow_ on `main` (Actions → _Dashboard on GitHub Pages_), for
+  example after a change that should be published without a new CI run. The workflow refuses
+  any other branch.
+- **Never** from pull requests, forks or other branches: there is no `pull_request` or `push`
+  trigger, and every job checks the event, branch and repository.
+- **Always the current `main`**: the build checks out `main` and stops unless its HEAD is still
+  the commit the run was created for, so re-running an older run cannot deploy old code or an
+  old workflow revision. Runs are serialized (concurrency group `pages`, a running deployment is
+  never cancelled, and a newer waiting run replaces an older waiting one), and `deploy` deploys
+  the artifact that `build` uploaded in the same run.
+
+The workflow only reads `ci-history` and never writes it; publication stays the job of
+`ci-history.yml` and its approval environment.
+
+### What the deployment runs
+
+| Job      | Permissions                       | Steps                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `gate`   | `contents: read`, `actions: read` | Check out `main`; [`reporting/ci/pages-gate.mjs`](../ci/pages-gate.mjs) decides from the event file and the triggering CI history run's jobs; output `deploy`                                                                                                                                                                                                                                                                                                                                                                              |
+| `build`  | `contents: read`, `actions: read` | Check out `main` (and stop if it has moved on since the run was created) and, separately and without credentials, the whole `ci-history` branch; the guard (no model credentials, no staged proposals); `npm run dashboard:data`; read-only reconciliation; `dashboard:history` with optional coverage; dashboard typecheck, lint and tests; the build with `DASHBOARD_REQUIRE_CI_HISTORY=1` and `DASHBOARD_BASE=/AI-QA-AutomationFramework/`; [`build/verify-site.ts`](build/verify-site.ts); upload with `actions/upload-pages-artifact` |
+| `deploy` | `pages: write`, `id-token: write` | `actions/deploy-pages` only, in the `github-pages` environment                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+
+All actions are GitHub's own (`actions/*`), pinned to commit SHAs. No secret is used; the
+workflow token reaches only the reconciliation's GET requests and the official actions.
+
+### Base path and routing
+
+- `DASHBOARD_BASE` sets Vite's `base`; unset, asset URLs stay relative (`./`), as before. Only a
+  single path segment is accepted ([`build/site.ts`](build/site.ts)).
+- Routes are in the URL hash (`#/test-cases/TC-003-07`), so every page, including a refreshed or
+  directly opened nested route, is `index.html`; GitHub Pages needs no rewrite rules. Lazy
+  route chunks are loaded from `assets/` under the base.
+- With an absolute base the build also emits a static `404.html` (no script, the same CSP), which
+  GitHub Pages serves for any unknown path below the site and which links back to the dashboard.
+
+To check a Pages build locally:
+
+```bash
+npm run dashboard:data
+npm run -s dashboard:history -- --history <checkout of ci-history>
+DASHBOARD_BASE=/AI-QA-AutomationFramework/ DASHBOARD_REQUIRE_CI_HISTORY=1 \
+  npm --prefix reporting/dashboard run build
+npx tsx reporting/dashboard/build/verify-site.ts artifacts/dashboard-site /AI-QA-AutomationFramework/ --require-history
+```
+
+### Coverage and freshness
+
+The reconciliation compares the published records with the CI runs the Actions API lists. Its
+report is optional for the deployment (`--coverage-if-verified`):
+
+- integrity verified and the runs listing complete: the coverage (published and unpublished
+  eligible runs, "n of m") is included;
+- integrity verified but the listing incomplete (the Actions API unavailable or rate-limited):
+  coverage is _undetermined_; the page says _Coverage could not be determined_ and gives no
+  "n of m" figure;
+- the reconciliation failed (no report) or integrity only _unverified_: the dashboard is built
+  without coverage and says _Coverage was not checked for this build_;
+- integrity _failed_: the export refuses, and nothing is deployed.
+
+Nothing is estimated in any case.
+
+The Executions page names the `ci-history` commit and its time, so the age of the data is always
+visible; the site does not update between deployments.
+
+### One-time repository settings
+
+1. _Settings → Pages → Build and deployment → Source_: **GitHub Actions**.
+2. _Settings → Environments → github-pages_ (created by the first deployment, or beforehand):
+   _Deployment branches and tags_ limited to **main**. Required reviewers are optional; the data
+   is already reviewed through the `ci-history` approval.
+3. The `CI history` workflow keeps its own `ci-history` environment and permissions; nothing
+   changes there.
+
+### Failure modes and recovery
+
+| Failure                                                                                                       | Effect                                                                                                                                  | Recovery                                                                          |
+| ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `ci-history` invalid or its immutability audit fails                                                          | Export refuses; nothing deployed; the previous site stays online                                                                        | Investigate with `reconcile-cli.ts`; records are never repaired by the deployment |
+| Reconciliation reports an integrity failure                                                                   | Export refuses; nothing deployed                                                                                                        | As above                                                                          |
+| Actions API unavailable or rate-limited                                                                       | Deployed with coverage _undetermined_ (no "n of m" figure), or without coverage if the reconciliation itself failed; stated on the page | Run the workflow again later                                                      |
+| Dashboard tests, the build (data validation, safety scan, agent layer evidence) or the site verification fail | Nothing uploaded or deployed                                                                                                            | Fix on `main`; the next CI history run, or a manual run, deploys                  |
+| CI history publication rejected, failed, cancelled or skipped, or nothing new published                       | The gate decides not to deploy                                                                                                          | Run the workflow manually if the code change should be published                  |
+| The gate cannot read the triggering run's jobs                                                                | The run fails; nothing deployed                                                                                                         | Re-run the gate, or run the workflow manually                                     |
+| `main` moved on after the run was created (or an older run was re-run)                                        | Build stops before anything is built                                                                                                    | None needed: the run for the newer commit deploys it                              |
+| Deployment step fails                                                                                         | The previous site stays online                                                                                                          | Re-run the failed jobs                                                            |
+
+A deployment replaces the whole site, so a broken deployment is undone by deploying a good
+commit again: fix or revert on `main`, then run the workflow manually (re-running an older run is
+refused once `main` has moved on).

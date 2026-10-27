@@ -1,0 +1,228 @@
+# Dashboard on GitHub Pages (Phase 5.3 M5): builds the RequestFlow QA Dashboard from main, with
+# the published CI history read from the ci-history branch, and deploys it to GitHub Pages.
+#
+# - Separate from CI history publication: this workflow only reads ci-history (no credentials,
+#   no write permission on contents) and never changes it; ci-history.yml remains its only
+#   writer, with its own approval environment.
+# - Automatic deployment only after a CI history run on main that composed AND published a run
+#   record (job gate, reporting/ci/pages-gate.mjs): a recorded product test failure is deployed
+#   like any other record; a CI history run that failed, was cancelled or skipped, or published
+#   nothing is not. A manual workflow_dispatch on main always deploys. There is no pull_request or
+#   push trigger: pull requests and forks cannot deploy. Every job checks the event, branch and
+#   repository again, and the github-pages environment restricts deployments to main.
+# - Always the current main: build checks out main and stops unless its HEAD is still the commit
+#   this run was created for, so a re-run of an older run (old code, old workflow revision) cannot
+#   deploy. Runs are serialized (concurrency group pages) and a running deployment is never
+#   cancelled; a newer run that is waiting replaces an older waiting one.
+# - Least privilege: gate and build have contents: read (checkouts) and actions: read (gate:
+#   the triggering run's jobs; build: the read-only reconciliation); deploy has only pages: write
+#   and id-token: write, which the official deploy-pages action requires, runs no repository
+#   code, and deploys the artifact uploaded by build in the same run.
+# - Fail closed: the history must pass full verification and the immutability audit, the build
+#   requires it (DASHBOARD_REQUIRE_CI_HISTORY=1), and the built site is verified before upload.
+#   Coverage is optional: if the Actions API is unavailable or reconciliation cannot verify
+#   integrity, the dashboard is built without coverage and says so; an integrity failure stops
+#   the deployment. Nothing is estimated.
+# - No secrets and no model credentials: the guard step refuses ANTHROPIC_API_KEY and staged
+#   proposals, as in CI.
+
+name: Dashboard on GitHub Pages
+
+on:
+  workflow_run:
+    workflows: [CI history]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# Nothing by default; each job grants only what it needs.
+permissions: {}
+
+# One deployment at a time; a running deployment is never cancelled.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Check the trigger
+    if: >-
+      github.repository == 'LarysaK/AI-QA-AutomationFramework' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.repository.full_name == github.repository))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      deploy: ${{ steps.gate.outputs.deploy }}
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Set up Node.js (.nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      # Reads the event file and, for workflow_run, the triggering run's jobs (GET only).
+      - name: Decide whether to deploy
+        id: gate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node reporting/ci/pages-gate.mjs >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build dashboard
+    needs: gate
+    if: >-
+      needs.gate.outputs.deploy == 'true' &&
+      github.repository == 'LarysaK/AI-QA-AutomationFramework' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.repository.full_name == github.repository))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      # A re-run of an older run (or a run that started after main moved on) would build old
+      # code with an old workflow revision; the run for the newer commit deploys instead.
+      - name: Confirm main has not moved on
+        run: |
+          head="$(git rev-parse HEAD)"
+          if [ "$head" != "$GITHUB_SHA" ]; then
+            echo "::error::main is at $head, but this run is for $GITHUB_SHA; nothing is deployed"
+            exit 1
+          fi
+
+      # Full history: the export audits every ci-history commit (immutability contract).
+      - name: Check out ci-history (read-only)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ci-history
+          path: ci-history
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js (.nvmrc)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            reporting/dashboard/package-lock.json
+
+      # The dashboard requires Node ^22.22.2 (jsdom); .nvmrc only says 22.
+      - name: Check Node.js version
+        run: |
+          node -e "const [a, b, c] = process.versions.node.split('.').map(Number); if (a < 22 || (a === 22 && (b < 22 || (b === 22 && c < 2)))) { console.error('::error::Node.js >= 22.22.2 is required'); process.exit(1); }"
+
+      - name: Guard (no model credentials, no staged proposals)
+        run: |
+          if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "::error::ANTHROPIC_API_KEY must not be set in CI"
+            exit 1
+          fi
+          if [ -e artifacts/proposals ]; then
+            echo "::error::staged AI proposals must not exist in CI"
+            exit 1
+          fi
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install dashboard dependencies
+        run: npm --prefix reporting/dashboard ci
+
+      - name: Generate dashboard snapshot
+        run: npm run dashboard:data
+
+      # Read-only (GET requests only). Exit 0 complete, 1 integrity failed, 2 gaps or
+      # undetermined; the export decides what the report may contribute, so the status is only
+      # logged here. A failed reconciliation leaves an empty report, and the export then omits
+      # coverage.
+      - name: Reconcile CI history (read-only, optional coverage)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          ./node_modules/.bin/tsx reporting/ci/reconcile-cli.ts --history ci-history > "$RUNNER_TEMP/reconciliation.json"
+          status=$?
+          set -e
+          echo "reconciliation exit status: $status"
+
+      - name: Export CI history
+        run: npm run -s dashboard:history -- --history ci-history --repository "$GITHUB_REPOSITORY" --coverage-if-verified "$RUNNER_TEMP/reconciliation.json"
+
+      - name: Dashboard typecheck
+        run: npm --prefix reporting/dashboard run typecheck
+
+      - name: Dashboard lint
+        run: npm --prefix reporting/dashboard run lint
+
+      - name: Dashboard tests
+        run: npm --prefix reporting/dashboard run test
+
+      - name: Build dashboard for GitHub Pages
+        env:
+          DASHBOARD_REQUIRE_CI_HISTORY: '1'
+        run: |
+          export DASHBOARD_BASE="/${GITHUB_REPOSITORY#*/}/"
+          npm --prefix reporting/dashboard run build
+
+      - name: Verify built site
+        run: |
+          ./node_modules/.bin/tsx reporting/dashboard/build/verify-site.ts artifacts/dashboard-site "/${GITHUB_REPOSITORY#*/}/" --require-history
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: artifacts/dashboard-site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: [gate, build]
+    if: >-
+      needs.gate.outputs.deploy == 'true' &&
+      github.repository == 'LarysaK/AI-QA-AutomationFramework' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.repository.full_name == github.repository))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

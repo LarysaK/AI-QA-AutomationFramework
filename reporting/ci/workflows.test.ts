@@ -8,14 +8,15 @@ import { describe, test } from 'node:test';
 import { ARTIFACTS, artifactName } from './handoff';
 
 /**
- * Structure of the two workflows (.github/workflows): triggers, permissions, pinned actions,
- * the hand-off artifacts and the dry run's steps. Offline: the files are read as text with a
+ * Structure of the three workflows (.github/workflows): triggers, permissions, pinned actions,
+ * the hand-off artifacts, the publisher's steps and the GitHub Pages deployment. Offline: the files are read as text with a
  * small step reader for this repository's two-space YAML layout.
  */
 
 const REPO = resolve('.');
 const CI = readFileSync(join(REPO, '.github/workflows/ci.yml'), 'utf8');
 const HISTORY = readFileSync(join(REPO, '.github/workflows/ci-history.yml'), 'utf8');
+const PAGES = readFileSync(join(REPO, '.github/workflows/pages.yml'), 'utf8');
 
 const UPLOAD = 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2';
 const DOWNLOAD = 'actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2';
@@ -100,16 +101,17 @@ function step(workflow: string, name: string): Step {
 const indexOf = (workflow: string, name: string): number =>
   steps(workflow).findIndex((s) => s.name === name);
 
-describe('workflows: both files', () => {
-  test('there are exactly the two reviewed workflows', () => {
+describe('workflows: all files', () => {
+  test('there are exactly the three reviewed workflows', () => {
     assert.deepEqual(readdirSync(join(REPO, '.github/workflows')).sort(), [
       'ci-history.yml',
       'ci.yml',
+      'pages.yml',
     ]);
   });
 
   test('every action is pinned to a full commit SHA with its version noted', () => {
-    for (const workflow of [CI, HISTORY]) {
+    for (const workflow of [CI, HISTORY, PAGES]) {
       const uses = code(workflow)
         .split('\n')
         .filter((l) => /^\s+uses: /.test(l));
@@ -121,7 +123,7 @@ describe('workflows: both files', () => {
   });
 
   test('no run script interpolates an expression, and no secrets are used', () => {
-    for (const workflow of [CI, HISTORY]) {
+    for (const workflow of [CI, HISTORY, PAGES]) {
       const scripts = steps(workflow).flatMap((s) => (s.run === undefined ? [] : [s.run]));
       assert.ok(scripts.length >= 8, String(scripts.length));
       for (const script of scripts) assert.ok(!script.includes('${{'), script);
@@ -133,7 +135,7 @@ describe('workflows: both files', () => {
 
   test("the step reader sees every step's script", () => {
     // Guards the reader itself: every `run:` line in the file belongs to a parsed step.
-    for (const workflow of [CI, HISTORY]) {
+    for (const workflow of [CI, HISTORY, PAGES]) {
       const runLines = code(workflow).match(/^ {8}run: /gm)?.length ?? 0;
       assert.equal(steps(workflow).filter((s) => s.run !== undefined).length, runLines);
     }
@@ -608,7 +610,7 @@ describe('workflows: CI history (ci-history.yml)', () => {
       t.skip('ruby is not installed');
       return;
     }
-    for (const file of ['ci.yml', 'ci-history.yml']) {
+    for (const file of ['ci.yml', 'ci-history.yml', 'pages.yml']) {
       const result = spawnSync(
         'ruby',
         [
@@ -621,5 +623,237 @@ describe('workflows: CI history (ci-history.yml)', () => {
       );
       assert.equal(result.stdout.trim(), 'ok', `${file}: ${result.stderr}`);
     }
+  });
+});
+
+describe('workflows: Dashboard on GitHub Pages (pages.yml)', () => {
+  const c = code(PAGES);
+  const GATE = jobBlock(c, 'gate');
+  const BUILD = jobBlock(c, 'build');
+  const DEPLOY = jobBlock(c, 'deploy');
+  const TRUSTED =
+    "github.repository == 'LarysaK/AI-QA-AutomationFramework' && " +
+    "github.ref == 'refs/heads/main' && " +
+    "(github.event_name == 'workflow_dispatch' || " +
+    "(github.event_name == 'workflow_run' && " +
+    "github.event.workflow_run.conclusion == 'success' && " +
+    "github.event.workflow_run.head_branch == 'main' && " +
+    'github.event.workflow_run.repository.full_name == github.repository))';
+  const GATED = `needs.gate.outputs.deploy == 'true' && ${TRUSTED}`;
+
+  test('triggered only by CI history runs on main and manual dispatch; never by pull requests or pushes', () => {
+    assert.match(
+      c,
+      /^on:\n {2}workflow_run:\n {4}workflows: \[CI history\]\n {4}types: \[completed\]\n {4}branches: \[main\]\n {2}workflow_dispatch:\n\n/m,
+    );
+    assert.doesNotMatch(c, /^ {2}(push|pull_request|pull_request_target|schedule):/m);
+    assert.doesNotMatch(c, /pull_request/);
+  });
+
+  test('three jobs: gate decides, build builds, deploy deploys; each checks repository, branch and event', () => {
+    assert.deepEqual(
+      [...c.slice(c.indexOf('\njobs:\n')).matchAll(/^ {2}([\w-]+):$/gm)].map((m) => m[1]),
+      ['gate', 'build', 'deploy'],
+    );
+    // Only a successful CI history run passes the job conditions; the gate then requires that it
+    // composed and published a record (failed, cancelled, skipped or nothing published: no deploy).
+    assert.equal(condition(GATE), TRUSTED);
+    assert.equal(condition(BUILD), GATED);
+    assert.equal(condition(DEPLOY), GATED);
+    assert.match(BUILD, /^ {4}needs: gate$/m);
+    assert.match(DEPLOY, /^ {4}needs: \[gate, build\]$/m);
+  });
+
+  test('the gate reads the trusted event and the triggering run’s jobs, and its decision is the only output', () => {
+    assert.match(GATE, /^ {4}outputs:\n {6}deploy: \$\{\{ steps\.gate\.outputs\.deploy \}\}\n\n/m);
+    const decide = step(GATE, 'Decide whether to deploy');
+    assert.equal(decide.id, 'gate');
+    assert.equal(decide.run, 'node reporting/ci/pages-gate.mjs >> "$GITHUB_OUTPUT"');
+    assert.deepEqual(decide.env, { GITHUB_TOKEN: '${{ github.token }}' });
+    assert.deepEqual(step(GATE, 'Check out main').with, {
+      ref: 'main',
+      'persist-credentials': 'false',
+    });
+    // No event value reaches a script or an env: the gate reads GITHUB_EVENT_PATH itself.
+    for (const line of c.split('\n').filter((l) => l.includes('github.event.'))) {
+      assert.match(
+        line,
+        /^ {6}\(?github\.event\.workflow_run\.(conclusion|head_branch|repository\.full_name)/,
+        line,
+      );
+    }
+  });
+
+  test('least privilege: gate and build read; deploy has only pages: write and id-token: write', () => {
+    assert.match(c, /^permissions: \{\}$/m);
+    assert.equal(c.match(/^ +permissions:/gm)?.length, 3);
+    assert.match(GATE, /^ {4}permissions:\n {6}contents: read\n {6}actions: read\n {4}outputs:/m);
+    assert.match(BUILD, /^ {4}permissions:\n {6}contents: read\n {6}actions: read\n\n/m);
+    assert.match(
+      DEPLOY,
+      /^ {4}permissions:\n {6}pages: write\n {6}id-token: write\n {4}environment:/m,
+    );
+    assert.equal(c.match(/write/g)?.length, 2, 'only pages: write and id-token: write');
+    assert.doesNotMatch(c, /contents: write|git push|git commit|secrets\./);
+  });
+
+  test('deploy runs only the official deploy action, in the github-pages environment', () => {
+    assert.match(
+      DEPLOY,
+      /^ {4}environment:\n {6}name: github-pages\n {6}url: \$\{\{ steps\.deployment\.outputs\.page_url \}\}$/m,
+    );
+    assert.deepEqual(
+      steps(DEPLOY).map((s) => s.uses),
+      ['actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1'],
+    );
+  });
+
+  test('runs are serialized and a running deployment is never cancelled', () => {
+    assert.match(c, /^concurrency:\n {2}group: pages\n {2}cancel-in-progress: false$/m);
+    assert.equal(c.match(/^ *concurrency:/gm)?.length, 1, 'no job-level concurrency overrides');
+  });
+
+  test('build checks out the current main and stops unless it is still this run’s commit', () => {
+    const main = step(BUILD, 'Check out main');
+    assert.equal(indexOf(BUILD, main.name), 0);
+    assert.deepEqual(main.with, { ref: 'main', 'persist-credentials': 'false' });
+    const moved = step(BUILD, 'Confirm main has not moved on');
+    assert.equal(indexOf(BUILD, moved.name), 1);
+    assert.equal(
+      moved.run,
+      [
+        'head="$(git rev-parse HEAD)"',
+        'if [ "$head" != "$GITHUB_SHA" ]; then',
+        '  echo "::error::main is at $head, but this run is for $GITHUB_SHA; nothing is deployed"',
+        '  exit 1',
+        'fi',
+      ].join('\n'),
+    );
+  });
+
+  test('the HEAD check passes on the current commit and refuses an older run (executed)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pages-head-'));
+    try {
+      const git = (...args: string[]) =>
+        spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', ...args], {
+          cwd: dir,
+          encoding: 'utf8',
+        });
+      git('init', '-q');
+      git('commit', '-q', '--allow-empty', '-m', 'old');
+      const old = git('rev-parse', 'HEAD').stdout.trim();
+      git('commit', '-q', '--allow-empty', '-m', 'new');
+      const head = git('rev-parse', 'HEAD').stdout.trim();
+      const script = step(BUILD, 'Confirm main has not moved on').run ?? '';
+      const run = (sha: string) =>
+        spawnSync('bash', ['-e', '-c', script], {
+          cwd: dir,
+          encoding: 'utf8',
+          env: { PATH: process.env['PATH'] ?? '', GITHUB_SHA: sha },
+        });
+      assert.equal(run(head).status, 0);
+      const stale = run(old);
+      assert.equal(stale.status, 1);
+      assert.match(stale.stdout, new RegExp(`main is at ${head}, but this run is for ${old}`));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('main and ci-history are checked out separately, without credentials; ci-history in full', () => {
+    assert.deepEqual(step(BUILD, 'Check out ci-history (read-only)').with, {
+      ref: 'ci-history',
+      path: 'ci-history',
+      'fetch-depth': '0',
+      'persist-credentials': 'false',
+    });
+    assert.equal(c.match(/persist-credentials: true/g), null);
+  });
+
+  test('the build steps run in the reviewed order', () => {
+    assert.deepEqual(
+      steps(BUILD).map((s) => s.name),
+      [
+        'Check out main',
+        'Confirm main has not moved on',
+        'Check out ci-history (read-only)',
+        'Set up Node.js (.nvmrc)',
+        'Check Node.js version',
+        'Guard (no model credentials, no staged proposals)',
+        'Install root dependencies',
+        'Install dashboard dependencies',
+        'Generate dashboard snapshot',
+        'Reconcile CI history (read-only, optional coverage)',
+        'Export CI history',
+        'Dashboard typecheck',
+        'Dashboard lint',
+        'Dashboard tests',
+        'Build dashboard for GitHub Pages',
+        'Verify built site',
+        'Upload Pages artifact',
+      ],
+    );
+  });
+
+  test('the same guard as CI: no model credentials and no staged proposals', () => {
+    assert.equal(
+      step(BUILD, 'Guard (no model credentials, no staged proposals)').run,
+      step(CI, 'Guard (no model credentials, no staged proposals)').run,
+    );
+  });
+
+  test('reconciliation is read-only and optional; the export decides, and coverage is never estimated', () => {
+    const reconcile = step(BUILD, 'Reconcile CI history (read-only, optional coverage)');
+    assert.deepEqual(reconcile.env, { GITHUB_TOKEN: '${{ github.token }}' });
+    assert.match(
+      reconcile.run ?? '',
+      /reporting\/ci\/reconcile-cli\.ts --history ci-history > "\$RUNNER_TEMP\/reconciliation\.json"/,
+    );
+    assert.equal(
+      step(BUILD, 'Export CI history').run,
+      'npm run -s dashboard:history -- --history ci-history --repository "$GITHUB_REPOSITORY" --coverage-if-verified "$RUNNER_TEMP/reconciliation.json"',
+    );
+    // The token reaches only the gate and the reconciliation (GET requests), and the official
+    // actions' defaults.
+    assert.equal(c.match(/github\.token/g)?.length, 2);
+  });
+
+  test('the build requires the CI history, uses the repository subpath and is verified before upload', () => {
+    const build = step(BUILD, 'Build dashboard for GitHub Pages');
+    assert.deepEqual(build.env, { DASHBOARD_REQUIRE_CI_HISTORY: "'1'" });
+    assert.equal(
+      build.run,
+      'export DASHBOARD_BASE="/${GITHUB_REPOSITORY#*/}/"\nnpm --prefix reporting/dashboard run build',
+    );
+    assert.equal(
+      step(BUILD, 'Verify built site').run,
+      './node_modules/.bin/tsx reporting/dashboard/build/verify-site.ts artifacts/dashboard-site "/${GITHUB_REPOSITORY#*/}/" --require-history',
+    );
+    const upload = step(BUILD, 'Upload Pages artifact');
+    assert.equal(
+      upload.uses,
+      'actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0',
+    );
+    assert.deepEqual(upload.with, { path: 'artifacts/dashboard-site' });
+    // deploy-pages deploys the artifact of this run, uploaded once by build.
+    assert.equal(c.match(/upload-pages-artifact|upload-artifact/g)?.length, 1);
+  });
+
+  test('only official actions are used', () => {
+    const uses = [...c.matchAll(/uses: ([\w-]+)\//g)].map((m) => m[1]);
+    assert.ok(uses.length >= 7);
+    assert.deepEqual([...new Set(uses)], ['actions']);
+  });
+
+  test('the CI history publisher is not touched: no shared jobs, no writes to ci-history', () => {
+    assert.doesNotMatch(c, /publish\.mjs|history-cli\.ts plan|environment:\n {6}name: ci-history/);
+    assert.doesNotMatch(code(HISTORY), /pages|deploy/i);
+  });
+
+  test('the gate names the CI history jobs exactly as ci-history.yml does', async () => {
+    const gateModule = await import('./pages-gate.mjs');
+    const names = [...code(HISTORY).matchAll(/^ {4}name: (.+)$/gm)].map((m) => m[1]);
+    assert.deepEqual(names, [...gateModule.REQUIRED_JOBS]);
+    assert.match(HISTORY, new RegExp(`^name: ${gateModule.HISTORY_WORKFLOW}$`, 'm'));
   });
 });
