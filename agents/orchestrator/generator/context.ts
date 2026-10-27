@@ -195,7 +195,7 @@ function canonicalFile(repoRoot: string, can: string): string {
 }
 
 /** Relative imports into apps/<app>/{api,data,pages}/, followed transitively, sorted. */
-function supportFiles(repoRoot: string, app: string, from: readonly string[]): string[] {
+export function supportFiles(repoRoot: string, app: string, from: readonly string[]): string[] {
   const allowed = new RegExp(`^apps/${app}/(api|data|pages)/`);
   const found = new Set<string>();
   const queue = [...from];

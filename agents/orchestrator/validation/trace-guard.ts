@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import ts from 'typescript';
 
 import type { ApprovedIdsResult } from './approved-ids';
+import { checkHealProposal, type HealArtifact } from './healer-guard';
 import { checkPlanProposal, type PlanArtifact } from './planner-guard';
 import type { Artifact, GuardFailure, GuardResult, ProposedChange } from './types';
 
@@ -18,6 +19,7 @@ import type { Artifact, GuardFailure, GuardResult, ProposedChange } from './type
  *   The exact runtime Playwright tags are G-DISCOVERY's job.
  * - Proposed content never contains a `@CAN-` tag; a modified test keeps its REQ/TC IDs.
  * - A Planner test-plan proposal follows the Planner rules PLN-001 – PLN-006 (planner-guard.ts).
+ * - A Healer heal proposal follows the Healer rules HEA-001 – HEA-009 (healer-guard.ts).
  *
  * Read-only: proposed content is parsed in memory, never written.
  */
@@ -101,6 +103,10 @@ export function checkTrace(
   // Planner content rules: proposals, provisional IDs, criteria, candidates, claims, provenance.
   if (artifact.artifactType === 'test-plan-proposal') {
     failures.push(...checkPlanProposal(artifact as unknown as PlanArtifact, ids, repoRoot));
+  }
+  // Healer content rules: evidence, classification and repair, scope, checks kept, no suppression.
+  if (artifact.artifactType === 'heal-proposal') {
+    failures.push(...checkHealProposal(artifact as unknown as HealArtifact, repoRoot));
   }
 
   // 2. A Generator test proposal carries approved traceability.

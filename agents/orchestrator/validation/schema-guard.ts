@@ -11,6 +11,7 @@ import type { Artifact, GuardFailure, GuardResult } from './types';
  */
 export const PAYLOAD_SCHEMA_PATHS: Readonly<Record<string, string>> = {
   'test-plan-proposal': 'agents/definitions/planner/planner-payload.schema.json',
+  'heal-proposal': 'agents/definitions/healer/healer-payload.schema.json',
 };
 
 /**

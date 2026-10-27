@@ -17,14 +17,16 @@ import { gitBlobSha } from './base-guard';
 import { checkPaths } from './path-guard';
 import type { ScriptRunner } from './static-guard';
 import type { Artifact, GuardName, GuardResult } from './types';
+import { PAYLOAD_SCHEMA_PATHS } from './schema-guard';
 import { ENVELOPE_SCHEMA_PATH, validateArtifact } from './validate';
 
 /**
  * Validator tests. Each run builds a small throwaway repository in the OS temp directory;
- * the real repository is only read for the envelope schema.
+ * the real repository is only read for the envelope schema and the Healer payload schema.
  */
 
 const SCHEMA_PATH = resolve(ENVELOPE_SCHEMA_PATH);
+const HEALER_PAYLOAD_SCHEMA = PAYLOAD_SCHEMA_PATHS['heal-proposal'] ?? '';
 
 const FIXTURE_FILES: Readonly<Record<string, string>> = {
   'package.json': '{ "name": "fixture" }\n',
@@ -77,6 +79,9 @@ before(() => {
     mkdirSync(dirname(join(repoRoot, path)), { recursive: true });
     writeFileSync(join(repoRoot, path), content);
   }
+  // G-SCHEMA validates a heal-proposal payload against the committed Healer payload schema.
+  mkdirSync(dirname(join(repoRoot, HEALER_PAYLOAD_SCHEMA)), { recursive: true });
+  writeFileSync(join(repoRoot, HEALER_PAYLOAD_SCHEMA), readFileSync(HEALER_PAYLOAD_SCHEMA));
   // A directory inside tests/ that points outside the repository.
   symlinkSync(outsideDir, join(repoRoot, 'tests/escape'));
   // G-STATIC lists files through Git and links node_modules.
@@ -130,9 +135,47 @@ function artifact(overrides: Record<string, unknown> = {}): Record<string, unkno
   };
 }
 
+/** A schema-valid Healer envelope: these tests are about the path and base guards. */
 const healer = {
   artifactType: 'heal-proposal',
   agent: { name: 'healer', definitionVersion: '1.0' },
+  payload: {
+    modelCall: 'offline-recorded-output',
+    requestedModel: null,
+    servedModel: 'recorded-output',
+    effort: null,
+    maxTokens: null,
+    definitionVersion: '1.0',
+    failure: {
+      reportName: 'report.json',
+      reportSha256: '0'.repeat(64),
+      playwrightVersion: '1.50.0',
+      specId: 'spec-1',
+      testFile: 'tests/requestflow/api/plain.spec.ts',
+      title: 'y',
+      line: 1,
+      project: 'api',
+      attempts: ['failed'],
+      startedAt: '2026-01-01T00:00:00.000Z',
+    },
+    evidence: [{ id: 'E-001', kind: 'error-message', source: 'report', sha256: '0'.repeat(64) }],
+    diagnosis: {
+      classification: 'test-code-issue',
+      explanation: 'Fixture diagnosis.',
+      evidenceRefs: ['E-001'],
+      confidence: 'medium',
+      alternatives: [],
+      missingEvidence: [],
+      recommendedInvestigation: [],
+    },
+    repair: {
+      expectedBehaviorPreserved: 'Fixture.',
+      risks: [],
+      validationSteps: [],
+      humanReview: 'required',
+      reviewGate: 'H3',
+    },
+  },
 };
 
 function shaOf(path: string): string {

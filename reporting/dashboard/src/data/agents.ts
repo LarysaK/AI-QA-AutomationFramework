@@ -102,20 +102,17 @@ const PACKAGE = 'package.json';
 const GEN = 'agents/orchestrator/generator';
 const PLAN = 'agents/orchestrator/planner';
 const PLANNER_DEF = 'agents/definitions/planner/definition.md';
+const HEAL = 'agents/orchestrator/healer';
+const HEALER_DEF = 'agents/definitions/healer/definition.md';
 const VAL = 'agents/orchestrator/validation';
 
-const notImplemented = (agent: 'analyzer' | 'healer', label: string): Evidence[] => [
+const notImplemented = (agent: 'analyzer', label: string): Evidence[] => [
   { path: `agents/definitions/${agent}`, absent: true },
   { path: `agents/orchestrator/${agent}`, absent: true },
   { path: README, quote: `- [ ] ${label} agent` },
 ];
 
-const specifiedOnly = (
-  id: 'analyzer' | 'healer',
-  name: string,
-  purpose: Fact,
-  approval: Fact,
-): Component => ({
+const specifiedOnly = (id: 'analyzer', name: string, purpose: Fact, approval: Fact): Component => ({
   id,
   name,
   kind: 'AI agent',
@@ -478,23 +475,98 @@ export const AGENT_LAYER: AgentLayer = {
         ],
       },
     ),
-    specifiedOnly(
-      'healer',
-      'Healer agent',
-      {
-        text: 'Defined in the Agent Standard: proposes healing patches that modify existing tests, after validation.',
+    {
+      id: 'healer',
+      name: 'Healer agent',
+      kind: 'AI agent',
+      status: 'implemented',
+      purpose: {
+        text: 'Diagnoses one Playwright test failure from explicitly supplied evidence and, when the evidence supports it, proposes a narrowly scoped repair for human review. It never applies a repair, never runs proposed code and never weakens or suppresses a test.',
         evidence: [
+          {
+            path: HEALER_DEF,
+            quote:
+              'The Healer **diagnoses one Playwright test failure** from explicitly supplied evidence',
+          },
           { path: STANDARD, quote: '| H3 | Healing patches, after validation (Healer) |' },
-          { path: STANDARD, quote: 'Generator (create), Healer (modify)' },
         ],
       },
-      {
-        text: 'H3 for healing patches.',
+      responsibilities: [
+        {
+          text: 'Accepts only authentic failure evidence: a Playwright JSON report in which the selected, committed test failed; otherwise it stops before any model call.',
+          evidence: [{ path: HEALER_DEF, quote: '**Authentic failure evidence.**' }],
+        },
+        {
+          text: 'Treats logs and source as untrusted data: instruction-like text, credentials and personal data stop the run before any model call.',
+          evidence: [{ path: HEALER_DEF, quote: '**Untrusted text screen and secret scan.**' }],
+        },
+        {
+          text: 'Classifies the failure (test code, test data or setup, application defect, environment, insufficient evidence); an application defect is escalated as a defect candidate, never worked around.',
+          evidence: [
+            {
+              path: HEALER_DEF,
+              quote: 'An application defect is never worked around in test code',
+            },
+          ],
+        },
+        {
+          text: 'Checks every proposal deterministically (payload schema and rules HEA-001 – HEA-009: evidence, repair scope, no weakened checks, no suppression, no concealing waits, no claims); a repair is then validated without execution authorization.',
+          evidence: [
+            {
+              path: HEALER_DEF,
+              quote:
+                'Checked deterministically by G-SCHEMA (payload schema) and G-TRACE (Healer content)',
+            },
+            { path: `${VAL}/healer-guard.ts`, tracked: true },
+          ],
+        },
+        {
+          text: 'Offline only in v1: it reads a recorded model output and makes no model call.',
+          evidence: [
+            {
+              path: HEALER_DEF,
+              quote:
+                'Offline only: `--fake-model-output` is required, and no live model call has been made.',
+            },
+            {
+              path: `${HEAL}/cli.ts`,
+              quote: 'Healer v1 is offline-only: --fake-model-output <file> is required',
+            },
+          ],
+        },
+      ],
+      code: {
+        text: 'Definition, output and payload schemas and prompt in agents/definitions/healer/; orchestrator in agents/orchestrator/healer/ (npm run agents:heal).',
         evidence: [
-          { path: STANDARD, quote: '| H3 | Healing patches, after validation (Healer) |' },
+          { path: HEALER_DEF, tracked: true },
+          { path: 'agents/definitions/healer/healer-output.schema.json', tracked: true },
+          { path: 'agents/definitions/healer/healer-payload.schema.json', tracked: true },
+          { path: 'agents/definitions/healer/prompt.md', tracked: true },
+          { path: `${HEAL}/heal.ts`, tracked: true },
+          { path: PACKAGE, quote: '"agents:heal": "tsx agents/orchestrator/healer/cli.ts"' },
         ],
       },
-    ),
+      tests: {
+        text: 'Automated tests with a fake model and synthetic failure reports: no provider is contacted, nothing is applied. Part of the agent suite in CI.',
+        evidence: [
+          {
+            path: `${HEAL}/healer.test.ts`,
+            quote: 'The model is always a fake; no provider is contacted',
+          },
+          { path: PACKAGE, quote: 'agents/orchestrator/healer/healer.test.ts' },
+        ],
+      },
+      approval: {
+        text: 'A diagnosis needs no approval. A repair needs a human H7 authorization for its execution-capable guards (closed) and approval at H3 to be applied, as an ordinary reviewed commit.',
+        evidence: [
+          {
+            path: HEALER_DEF,
+            quote: 'A diagnosis is a report: no approval is needed to stage it.',
+          },
+          { path: HEALER_DEF, quote: 'and applying it needs gate **H3**' },
+        ],
+      },
+    },
   ],
   guards: [
     {
@@ -613,8 +685,11 @@ export const AGENT_LAYER: AgentLayer = {
       id: 'H3',
       requires: 'Healing patches, after validation (Healer)',
       here: {
-        text: 'Not reachable: the Healer is not implemented.',
-        evidence: notImplemented('healer', 'Healer'),
+        text: 'Reachable: the Healer stages healing patches. Their execution-capable guards wait for a human H7 authorization (closed), and no apply workflow exists; an accepted repair reaches the repository only as an ordinary, reviewed commit by a human.',
+        evidence: [
+          { path: HEALER_DEF, quote: 'and applying it needs gate **H3**' },
+          { path: README, quote: '- [ ] Proposal approval and apply workflow' },
+        ],
       },
     },
     {
@@ -714,7 +789,7 @@ export const AGENT_LAYER: AgentLayer = {
       ],
     },
     fakeModelTests: {
-      text: 'The agent suite in CI (Agent validation and generator tests) runs the validator’s deterministic tests and the Generator’s and the Planner’s tests with a fake model.',
+      text: 'The agent suite in CI (Agent validation and generator tests) runs the validator’s deterministic tests and the Generator’s, the Planner’s and the Healer’s tests with a fake model.',
       evidence: [
         { path: CI, quote: '- name: Agent validation and generator tests' },
         { path: CI, quote: 'npm run --silent agents:test | tee artifacts/ci/agents.tap' },
@@ -727,6 +802,11 @@ export const AGENT_LAYER: AgentLayer = {
           quote: 'The model is always a fake; no provider is contacted',
         },
         { path: PACKAGE, quote: 'agents/orchestrator/planner/planner.test.ts' },
+        {
+          path: `${HEAL}/healer.test.ts`,
+          quote: 'The model is always a fake; no provider is contacted',
+        },
+        { path: PACKAGE, quote: 'agents/orchestrator/healer/healer.test.ts' },
       ],
     },
     liveRuns: {
