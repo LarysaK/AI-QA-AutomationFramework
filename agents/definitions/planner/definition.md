@@ -1,15 +1,16 @@
 # Planner Agent — definition
 
-definitionVersion: 1.0
+definitionVersion: 1.1
 
 | Item              | Value                                                          |
 | ----------------- | -------------------------------------------------------------- |
 | Agent             | `planner`                                                      |
-| Requires standard | Agent Standard 1.x ([standard.md](../../standard/standard.md)) |
+| Requires standard | Agent Standard 2.x ([standard.md](../../standard/standard.md)) |
 | Artifact type     | `test-plan-proposal`                                           |
 | Output schema     | [`planner-output.schema.json`](planner-output.schema.json)     |
 | Payload schema    | [`planner-payload.schema.json`](planner-payload.schema.json)   |
 | System prompt     | [`prompt.md`](prompt.md)                                       |
+| Revision          | 1.1: requires Agent Standard 2.x; nothing else changed (minor) |
 | Orchestrator      | `agents/orchestrator/planner/` (`npm run agents:plan`)         |
 
 The Planner proposes **test-planning additions** for one or more explicitly selected, approved

@@ -275,7 +275,7 @@ describe('Healer: diagnoses (1–5)', () => {
     ]);
     const artifact = readJson(join(result.taskDir, 'artifact.json'));
     assert.equal(artifact['artifactType'], 'heal-proposal');
-    assert.deepEqual(artifact['agent'], { name: 'healer', definitionVersion: '1.0' });
+    assert.deepEqual(artifact['agent'], { name: 'healer', definitionVersion: '1.1' });
     assert.deepEqual(artifact['proposedChanges'], []);
     assert.deepEqual(artifact['traceability'], {
       requirements: ['REQ-003', 'REQ-004', 'REQ-005', 'REQ-008'],

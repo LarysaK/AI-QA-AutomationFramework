@@ -1,5 +1,5 @@
 /**
- * Shared types for the deterministic guards (Agent Standard v1, section 14: Guards).
+ * Shared types for the deterministic guards (Agent Standard v2, section 14: Guards).
  */
 
 export type GuardName =
@@ -27,7 +27,8 @@ export interface GuardResult {
   readonly notes?: readonly string[];
 }
 
-export type AgentName = 'planner' | 'generator' | 'analyzer' | 'healer';
+/** The three agents of Agent Standard 2.0 (section 2.1); the Validator is not an agent. */
+export type AgentName = 'planner' | 'generator' | 'healer';
 export type ChangeKind = 'test-change' | 'support-change' | 'plan-change';
 export type Operation = 'create' | 'modify';
 

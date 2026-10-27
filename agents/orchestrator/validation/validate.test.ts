@@ -113,8 +113,8 @@ function change(overrides: Change = {}): Change {
 function artifact(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     artifactType: 'test-proposal',
-    schemaVersion: '1.0',
-    standardVersion: '1.0',
+    schemaVersion: '2.0',
+    standardVersion: '2.0',
     agent: { name: 'generator', definitionVersion: '1.0' },
     taskId: 'gen-tc-003-06',
     status: 'READY',

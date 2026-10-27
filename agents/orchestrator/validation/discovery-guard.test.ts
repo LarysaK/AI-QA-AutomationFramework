@@ -329,8 +329,8 @@ describe('execution authorization (gate H7)', () => {
   const AUTH_PATH = 'tests/requestflow/api/discovery-auth-fixture.spec.ts';
   const envelope = {
     artifactType: 'test-proposal',
-    schemaVersion: '1.0',
-    standardVersion: '1.2',
+    schemaVersion: '2.0',
+    standardVersion: '2.0',
     agent: { name: 'generator', definitionVersion: '1.0' },
     taskId: 'discovery-auth',
     status: 'READY',

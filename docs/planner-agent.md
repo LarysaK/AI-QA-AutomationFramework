@@ -2,7 +2,7 @@
 
 The Planner proposes **test-planning additions** for one or more explicitly selected, approved
 requirements: new test cases with **provisional** IDs, and suggested automation candidates among
-the existing approved test cases. It follows [Agent Standard v1.2](../agents/standard/standard.md)
+the existing approved test cases. It follows [Agent Standard v2.0](../agents/standard/standard.md)
 and [ADR-0001](adr/0001-ai-outside-test-runtime.md): **AI proposes, deterministic code validates,
 a human approves.**
 
@@ -130,5 +130,3 @@ cases (prompt injection) run on temporary copies.
   trying to interpret it.
 - Related test cases must belong to a requested requirement (for example, REQ-007's matrix cases
   owned by other requirements need those requirements requested too).
-- The committed Agent Standard and Dashboard still name the Analyzer agent; removing it is a
-  separate, controlled revision.

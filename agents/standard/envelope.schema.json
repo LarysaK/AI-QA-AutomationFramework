@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "agents/standard/envelope.schema.json",
   "title": "Agent artifact envelope",
-  "description": "Common envelope for every agent artifact (Agent Standard v1.2, section 9: Artifact envelope). Agent-specific content goes in `payload` and is validated by that agent's own schema.",
+  "description": "Common envelope for every agent artifact (Agent Standard v2.0, section 9: Artifact envelope). Agent-specific content goes in `payload` and is validated by that agent's own schema.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -22,17 +22,17 @@
   ],
   "properties": {
     "artifactType": {
-      "enum": ["test-plan-proposal", "test-proposal", "failure-analysis", "heal-proposal"]
+      "enum": ["test-plan-proposal", "test-proposal", "heal-proposal"]
     },
     "schemaVersion": {
-      "description": "Envelope schema version. This schema accepts major version 1.",
+      "description": "Envelope schema version. This schema accepts major version 2.",
       "type": "string",
-      "pattern": "^1\\.\\d+$"
+      "pattern": "^2\\.\\d+$"
     },
     "standardVersion": {
-      "description": "Agent Standard version the agent followed.",
+      "description": "Agent Standard version the agent followed. This schema accepts major version 2.",
       "type": "string",
-      "pattern": "^1\\.\\d+$"
+      "pattern": "^2\\.\\d+$"
     },
     "agent": {
       "type": "object",
@@ -40,7 +40,8 @@
       "required": ["name", "definitionVersion"],
       "properties": {
         "name": {
-          "enum": ["planner", "generator", "analyzer", "healer"]
+          "description": "The three agents of Agent Standard 2.0 (section 2.1). The Validator is not an agent.",
+          "enum": ["planner", "generator", "healer"]
         },
         "definitionVersion": {
           "type": "string",
@@ -145,26 +146,6 @@
       }
     },
     {
-      "description": "A failure analysis never proposes changes.",
-      "if": {
-        "type": "object",
-        "properties": {
-          "artifactType": {
-            "const": "failure-analysis"
-          }
-        }
-      },
-      "then": {
-        "type": "object",
-        "properties": {
-          "proposedChanges": {
-            "type": "array",
-            "maxItems": 0
-          }
-        }
-      }
-    },
-    {
       "description": "Each artifact type is produced by exactly one agent.",
       "if": {
         "type": "object",
@@ -216,29 +197,6 @@
         "type": "object",
         "properties": {
           "artifactType": {
-            "const": "failure-analysis"
-          }
-        }
-      },
-      "then": {
-        "type": "object",
-        "properties": {
-          "agent": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "const": "analyzer"
-              }
-            }
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "type": "object",
-        "properties": {
-          "artifactType": {
             "const": "heal-proposal"
           }
         }
@@ -272,9 +230,9 @@
       "pattern": "^CAN-\\d{3}$"
     },
     "ruleId": {
-      "description": "Standard rule (STD-AREA-NNN) or agent rule (PLN/GEN/ANA/HEA-NNN).",
+      "description": "Standard rule (STD-AREA-NNN) or agent rule (PLN/GEN/HEA-NNN). The ANA- prefix of Standard 1.x is retired.",
       "type": "string",
-      "pattern": "^(STD-(SRC|CTX|TRC|AUTH|ART|UNC|CAN|TST|SEC)|PLN|GEN|ANA|HEA)-\\d{3}$"
+      "pattern": "^(STD-(SRC|CTX|TRC|AUTH|ART|UNC|CAN|TST|SEC)|PLN|GEN|HEA)-\\d{3}$"
     },
     "approvedId": {
       "anyOf": [
