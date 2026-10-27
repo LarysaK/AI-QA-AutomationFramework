@@ -248,6 +248,117 @@ describe('CI history export (dashboard data, M4)', () => {
   });
 });
 
+/** Runs the export CLI; the parsed output file, or null when nothing was written. */
+function cliExport(args: readonly string[]): {
+  status: number | null;
+  stderr: string;
+  exported: Exported | null;
+} {
+  const out = join(temporary('ci-export-optional-'), 'ci-history.json');
+  const cli = spawnSync(TSX, [join(__dirname, 'history-export-cli.ts'), ...args, '--out', out], {
+    cwd: REPO,
+    encoding: 'utf8',
+    env: { PATH: process.env['PATH'] ?? '' },
+  });
+  return {
+    status: cli.status,
+    stderr: cli.stderr,
+    exported: existsSync(out) ? (JSON.parse(readFileSync(out, 'utf8')) as Exported) : null,
+  };
+}
+
+/** A copy of a real report with its integrity verdict replaced. */
+function withIntegrity(file: string, integrity: string): string {
+  const report = JSON.parse(readFileSync(file, 'utf8')) as { verdict: Record<string, unknown> };
+  report.verdict['integrity'] = integrity;
+  const copy = join(temporary('ci-export-integrity-'), 'report.json');
+  writeFileSync(copy, JSON.stringify(report));
+  return copy;
+}
+
+describe('CI history export: optional coverage for unattended builds (--coverage-if-verified)', () => {
+  test('a verified report of the same commit: coverage is included, as with --reconciliation', async () => {
+    const dir = await history();
+    const result = cliExport(['--history', dir, '--coverage-if-verified', reconciliation(dir)]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.exported?.coverage?.['verdict'], 'gaps');
+    assert.equal(result.stderr, '');
+  });
+
+  const omitted: [string, (dir: string) => string, RegExp][] = [
+    ['a missing report', () => join(temporary('ci-export-none-'), 'absent.json'), /missing/],
+    [
+      'an empty report (the reconciliation itself failed)',
+      () => {
+        const file = join(temporary('ci-export-empty-'), 'report.json');
+        writeFileSync(file, '');
+        return file;
+      },
+      /not JSON/,
+    ],
+    [
+      'a report whose integrity is unverified',
+      (dir) => withIntegrity(reconciliation(dir), 'unverified'),
+      /did not verify/,
+    ],
+  ];
+  for (const [name, report, reason] of omitted) {
+    test(`${name}: exported without coverage, never estimated, and the omission is said`, async () => {
+      const dir = await history();
+      const result = cliExport(['--history', dir, '--coverage-if-verified', report(dir)]);
+      assert.equal(result.status, 0, result.stderr);
+      assert.ok(result.exported);
+      assert.equal(result.exported.coverage, null);
+      assert.deepEqual(validateExport(result.exported), []);
+      assert.match(result.stderr, /^coverage not included: /);
+      assert.match(result.stderr, reason);
+    });
+  }
+
+  test('a report that found an integrity failure refuses the export', async () => {
+    const dir = await history();
+    const result = cliExport([
+      '--history',
+      dir,
+      '--coverage-if-verified',
+      withIntegrity(reconciliation(dir), 'failed'),
+    ]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /integrity failure/);
+    assert.equal(result.exported, null);
+  });
+
+  test('a verified report of another ci-history commit is still refused', async () => {
+    const dir = await history();
+    const report = JSON.parse(readFileSync(reconciliation(dir), 'utf8')) as {
+      history: Record<string, unknown>;
+    };
+    report.history['commit'] = '0'.repeat(40);
+    const file = join(temporary('ci-export-other-'), 'report.json');
+    writeFileSync(file, JSON.stringify(report));
+    const result = cliExport(['--history', dir, '--coverage-if-verified', file]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /the reconciliation checked another ci-history commit/);
+    assert.equal(result.exported, null);
+  });
+
+  test('--reconciliation and --coverage-if-verified are mutually exclusive', async () => {
+    const dir = await history();
+    const report = reconciliation(dir);
+    const result = cliExport([
+      '--history',
+      dir,
+      '--reconciliation',
+      report,
+      '--coverage-if-verified',
+      report,
+    ]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /mutually exclusive/);
+    assert.equal(result.exported, null);
+  });
+});
+
 describe('CI history export: validation the dashboard build repeats', () => {
   async function valid(): Promise<Record<string, unknown>> {
     const dir = await history();

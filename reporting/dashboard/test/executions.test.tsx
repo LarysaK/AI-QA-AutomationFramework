@@ -100,6 +100,27 @@ describe('Executions: published runs (real export)', () => {
     ).toBeTruthy();
   });
 
+  test('an incomplete runs listing (API unavailable) gives no "n of m" coverage figure', async () => {
+    // As exported when the Actions API answered nothing: integrity verified, nothing listed.
+    const history = clone();
+    const coverage = {
+      ...(history.coverage as NonNullable<ExecutionHistory['coverage']>),
+      listingComplete: false,
+      runsListed: 0,
+      verdict: 'undetermined' as const,
+      missingAttempts: 0,
+      unpublished: [],
+    };
+    await renderAt('#/executions', { ...history, coverage });
+    const card = screen.getByRole('heading', { name: 'Coverage of CI runs' })
+      .parentElement as HTMLElement;
+    expect(card.textContent).toContain('GitHub Actions listed 0 runs');
+    expect(card.textContent).toContain('(an incomplete listing)');
+    expect(within(card).getByText('Coverage could not be determined.')).toBeTruthy();
+    expect(card.textContent).toContain('eligible runs missing from the listing cannot be counted');
+    expect(card.textContent).not.toMatch(/\d+ of \d+ eligible/);
+  });
+
   test('an export with no records says so, and keeps the coverage', async () => {
     const history = { ...clone(), records: [], source: { ...FIXTURE.source, records: 0 } };
     await renderAt('#/executions', history);

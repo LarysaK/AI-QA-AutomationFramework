@@ -30,6 +30,7 @@ import { RUN_2_CONTEXT } from './context.test';
 import './handoff.test';
 import './history-export.test';
 import './history.test';
+import './pages-gate.test';
 import './publish.test';
 import './reconcile.test';
 import './workflows.test';

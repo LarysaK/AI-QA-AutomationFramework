@@ -112,10 +112,22 @@ function CoverageCard({ history }: { history: ExecutionHistory }) {
         When this dashboard was built, GitHub Actions listed {String(coverage.runsListed)} runs of
         the <code>CI</code> workflow on <code>main</code>
         {coverage.listingComplete ? '' : ' (an incomplete listing)'}.{' '}
-        <strong>
-          {String(eligible)} of {String(total)} eligible run attempts are published
-        </strong>
-        {coverage.verdict === 'undetermined' ? '; others may be missing from the listing.' : '.'}
+        {coverage.verdict === 'undetermined' ? (
+          // An incomplete listing (for example, the Actions API was unavailable) cannot show how
+          // many eligible runs exist, so no "n of m" figure is given.
+          <>
+            <strong>Coverage could not be determined.</strong> {String(eligible)} published run
+            attempt{eligible === 1 ? ' is' : 's are'} known, but eligible runs missing from the
+            listing cannot be counted.
+          </>
+        ) : (
+          <>
+            <strong>
+              {String(eligible)} of {String(total)} eligible run attempts are published
+            </strong>
+            .
+          </>
+        )}
       </p>
       {coverage.unpublished.length > 0 && (
         <>
