@@ -30,8 +30,7 @@ each claim. Everything marked as a fact here is verified at the audit commit `76
    two browser contexts in the E2E tests; one API session per user and the replayed-cookie check
    in [`demo-authentication.spec.ts`](../tests/requestflow/api/demo-authentication.spec.ts).
 5. **CI evidence** (2 min). The `ci-history` branch: one immutable record per run, published only
-   after approval; run #23 tested `7624640` and all 30 tests then committed passed. The M10B API
-   tests have no published CI result until their first run on `main`.
+   after approval; run #33 tested `8b21342` and all 55 committed tests passed, first attempt.
 6. **AI guardrails** (3 min). [Agent Standard §8](../agents/standard/standard.md#8-human-approval-gates)
    gates H1–H7; the validator's seven guards; why H7 is closed; the ESLint boundary that keeps
    AI out of the test runtime.

@@ -32,10 +32,9 @@
 Execution evidence, kept apart:
 
 - **Published CI.** The 30 tests of the M6 audit commit all passed, first attempt, in published CI
-  run [#23](https://github.com/LarysaK/AI-QA-AutomationFramework/actions/runs/40497439668). The
-  latest published run, [#31](https://github.com/LarysaK/AI-QA-AutomationFramework/actions/runs/40544055341),
-  tested `3b7438a` (the base of M10B): 30 of 30 passed. The 25 tests added in M10B and the
-  corrected TC-002-02 test have no published CI result yet.
+  run [#23](https://github.com/LarysaK/AI-QA-AutomationFramework/actions/runs/40497439668). Published
+  CI run [#33](https://github.com/LarysaK/AI-QA-AutomationFramework/actions/runs/40582995630) tested `8b21342`, the merge of M10B: all 55 tests passed, first attempt,
+  including the 25 tests added in M10B and the corrected TC-002-02 test.
 - **Local (M10B).** At commit `74ea929` the full suite passed 5 times in a row with
   `--repeat-each=5 --retries=0` (275 of 275), with the default workers and with `CI=1` and 2
   workers; the four changed or new API files also passed 20 times with 8 workers (560 of 560).
