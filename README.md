@@ -32,17 +32,17 @@ forbids runtime code from importing `agents/**` or an LLM SDK. See
 
 ## Repository layout
 
-| Directory                                 | Responsibility                                                                                     |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `specs/`                                  | Behavioural source of truth: requirements and the test plan                                        |
-| `apps/requestflow/`                       | The AUT (`app/`), page objects (`pages/`), API client (`api/`) and demo users (`data/`)            |
-| `tests/`                                  | Playwright tests: test flow and business assertions                                                |
-| `agents/`                                 | AI layer: the Agent Standard, the Generator definition, the orchestrator (Generator and Validator) |
-| `reporting/`                              | Dashboard data, CI run records and history, the QA Dashboard                                       |
-| `.github/workflows/`                      | `ci.yml`, `ci-history.yml`, `pages.yml`                                                            |
-| `docs/`                                   | Project documentation and Architecture Decision Records                                            |
-| `framework/`, `prompts/`, `integrations/` | **Planned** layers; placeholders only today                                                        |
-| `artifacts/`                              | Run outputs, reports, AI proposals (gitignored)                                                    |
+| Directory                                 | Responsibility                                                                                                                                                                               |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `specs/`                                  | Behavioural source of truth: requirements and the test plan                                                                                                                                  |
+| `apps/requestflow/`                       | The AUT (`app/`), page objects (`pages/`), API client (`api/`) and demo users (`data/`)                                                                                                      |
+| `tests/`                                  | Playwright tests: test flow and business assertions                                                                                                                                          |
+| `agents/`                                 | AI layer: the Agent Standard; definitions of the three AI agents (Planner, Generator, Healer); the shared orchestrator code, including the deterministic Validator, which is not an AI agent |
+| `reporting/`                              | Dashboard data, CI run records and history, the QA Dashboard                                                                                                                                 |
+| `.github/workflows/`                      | `ci.yml`, `ci-history.yml`, `pages.yml`                                                                                                                                                      |
+| `docs/`                                   | Project documentation and Architecture Decision Records                                                                                                                                      |
+| `framework/`, `prompts/`, `integrations/` | **Planned** layers; placeholders only today                                                                                                                                                  |
+| `artifacts/`                              | Run outputs, reports, AI proposals (gitignored)                                                                                                                                              |
 
 ## Project status
 

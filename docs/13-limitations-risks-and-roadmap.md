@@ -22,8 +22,8 @@ No duplicate test-case IDs, orphan tests, unknown tags or broken TC/REQ tag pair
 ## Limitations
 
 - **Coverage.** 33 of 96 test cases are automated and consistent (33 linked by tags); 61 are not
-  yet automated; 2 are manual by design. P0 coverage is 14 of 38. The tests added in M10B have
-  passed locally (repeated, without retries) but not yet in a published CI run.
+  yet automated; 2 are manual by design. P0 coverage is 14 of 38. All 55 committed tests passed
+  in published CI run #33 (commit `8b21342`); a pass is evidence for the linked test cases only.
 - **Shared state.** All tests share one in-memory server; empty-list scenarios cannot be automated
   deterministically.
 - **One browser.** Only the `chromium` project is configured.

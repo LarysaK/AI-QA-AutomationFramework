@@ -46,9 +46,9 @@ access to an AI provider, and the product tests never import the agent layer
 - The approved human test plan: **96 test cases** for **10 requirements**, and **5 canonical
   reference tests** (CAN-001 – CAN-005), automated and passing.
 - **55 committed Playwright test instances** in 8 files, linked to **33** test cases by
-  `@TC-…` tags (P0: 14 of 38). The 30 tests of the audit commit all passed in published CI run
-  #23; the M10B API tests passed locally and have no published CI result yet (see
-  [E](05-automation-coverage-matrix.md)).
+  `@TC-…` tags (P0: 14 of 38). All 55 passed, first attempt, in published CI run
+  [#33](https://github.com/LarysaK/AI-QA-AutomationFramework/actions/runs/40582995630) for commit `8b21342` (see [E](05-automation-coverage-matrix.md)); the 30 tests of
+  the audit commit had passed in published CI run #23.
 - The agent layer: Agent Standard v2.0 with exactly three AI agents (Planner, Generator, Healer)
   and the deterministic Validator, which is not an AI agent; a seven-guard validator with human
   execution authorization (H7); Generator Agent v1, demonstrated **offline only** with a
